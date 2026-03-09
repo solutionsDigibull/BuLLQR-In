@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00B4D8"/>
+      <stop offset="50%" stop-color="#0096C7"/>
+      <stop offset="100%" stop-color="#0077B6"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFBE0B"/>
+      <stop offset="50%" stop-color="#FB8500"/>
+      <stop offset="100%" stop-color="#E85D04"/>
+    </linearGradient>
+    <linearGradient id="g3" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0096C7"/>
+      <stop offset="100%" stop-color="#48CAE4"/>
+    </linearGradient>
+    <linearGradient id="g4" x1="100%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#FB8500"/>
+      <stop offset="100%" stop-color="#FFBE0B"/>
+    </linearGradient>
+  </defs>
+  <!-- Left horn -->
+  <polygon points="8,8 18,6 20,22" fill="url(#g3)"/>
+  <!-- Right horn -->
+  <polygon points="56,8 46,6 44,22" fill="url(#g4)"/>
+  <!-- Left side of head (blue) -->
+  <polygon points="10,24 20,18 32,32 18,38" fill="url(#g1)"/>
+  <polygon points="10,24 18,38 14,48 8,36" fill="#0077B6"/>
+  <polygon points="18,38 32,32 28,48 14,48" fill="#0096C7"/>
+  <!-- Right side of head (orange) -->
+  <polygon points="54,24 44,18 32,32 46,38" fill="url(#g2)"/>
+  <polygon points="54,24 46,38 50,48 56,36" fill="#E85D04"/>
+  <polygon points="46,38 32,32 36,48 50,48" fill="#FB8500"/>
+  <!-- Nose/snout area -->
+  <polygon points="22,48 32,44 42,48 38,58 26,58" fill="#FF9500"/>
+  <polygon points="22,48 28,48 32,44" fill="#0088B0"/>
+  <polygon points="42,48 36,48 32,44" fill="#E07000"/>
+  <!-- Nostrils -->
+  <circle cx="28" cy="53" r="2" fill="#CC6600"/>
+  <circle cx="36" cy="53" r="2" fill="#CC6600"/>
+  <!-- Eyes -->
+  <circle cx="24" cy="30" r="2.5" fill="#FFFFFF"/>
+  <circle cx="40" cy="30" r="2.5" fill="#FFFFFF"/>
+  <circle cx="24" cy="30" r="1.2" fill="#1A1A2E"/>
+  <circle cx="40" cy="30" r="1.2" fill="#1A1A2E"/>
+  <!-- Ears -->
+  <polygon points="12,18 8,24 16,24" fill="#48CAE4"/>
+  <polygon points="52,18 56,24 48,24" fill="#FFBE0B"/>
+</svg>

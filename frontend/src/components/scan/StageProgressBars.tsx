@@ -1,0 +1,91 @@
+import type { StageProgress } from '../../types/analytics.ts';
+
+interface StageProgressBarsProps {
+  stages: StageProgress[];
+  targetStatus: string;
+  loading?: boolean;
+}
+
+export default function StageProgressBars({
+  stages,
+  targetStatus,
+  loading = false,
+}: StageProgressBarsProps) {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+        <h3 className="text-base font-medium text-gray-700 mb-3">Production Progress</h3>
+        <p className="text-sm text-gray-400">Loading progress...</p>
+      </div>
+    );
+  }
+
+  if (stages.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+        <h3 className="text-base font-medium text-gray-700 mb-3">Production Progress</h3>
+        <p className="text-sm text-gray-400">No progress data available.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-base font-medium text-gray-700">Production Progress</h3>
+        {targetStatus !== 'not_set' && (
+          <span
+            className={`text-xs font-medium px-2 py-0.5 rounded ${
+              targetStatus === 'completed'
+                ? 'bg-green-100 text-green-700'
+                : 'bg-blue-100 text-blue-700'
+            }`}
+          >
+            Target: {targetStatus === 'completed' ? 'Completed' : 'In Progress'}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        {stages.map((stage) => {
+          const pct = Math.min(stage.progress_percentage, 100);
+          const hasTarget = stage.target_count > 0;
+
+          return (
+            <div key={stage.stage_name}>
+              <div className="flex items-center justify-between text-sm mb-1">
+                <span className="font-medium text-gray-700">
+                  {stage.stage_sequence}. {stage.stage_name}
+                </span>
+                <span className="text-gray-500 text-xs tabular-nums">
+                  {stage.current_count}
+                  {hasTarget ? ` / ${stage.target_count}` : ''}
+                  {stage.not_ok_count > 0 && (
+                    <span className="text-danger ml-1">
+                      ({stage.not_ok_count} NOK)
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                {hasTarget ? (
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      pct >= 100 ? 'bg-success' : 'bg-primary'
+                    }`}
+                    style={{ width: `${pct}%` }}
+                  />
+                ) : (
+                  <div
+                    className="h-full rounded-full bg-gray-300"
+                    style={{ width: stage.current_count > 0 ? '100%' : '0%' }}
+                  />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

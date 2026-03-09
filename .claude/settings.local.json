@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker:*)",
+      "Bash(docker compose:*)",
+      "Bash(python -m alembic revision:*)",
+      "Bash(python -m alembic upgrade:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker-compose exec:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(npx tsc:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(ls:*)",
+      "Bash(netstat:*)",
+      "Bash(where ffmpeg:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec:*)",
+      "mcp__ide__getDiagnostics"
+    ]
+  }
+}
