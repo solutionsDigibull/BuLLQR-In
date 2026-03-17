@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { isAxiosError } from 'axios';
 import { downloadReport } from '../../services/analytics.ts';
+import { listProducts } from '../../services/config.ts';
+import type { Product } from '../../types/config.ts';
 
 function defaultStartDate(): string {
   const d = new Date();
@@ -13,12 +15,24 @@ function todayDate(): string {
 }
 
 export default function ExportPanel() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState('');
   const [startDate, setStartDate] = useState(defaultStartDate);
   const [endDate, setEndDate] = useState(todayDate);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    listProducts()
+      .then((data) => setProducts(data))
+      .catch(() => {});
+  }, []);
+
   async function handleDownload() {
+    if (!selectedProductId) {
+      setError('Please select a product.');
+      return;
+    }
     if (!startDate || !endDate) return;
     if (startDate > endDate) {
       setError('Start date must be before end date.');
@@ -27,7 +41,7 @@ export default function ExportPanel() {
     setDownloading(true);
     setError(null);
     try {
-      await downloadReport('combined', startDate, endDate);
+      await downloadReport('combined', startDate, endDate, selectedProductId);
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 400) {
         setError(err.response.data?.detail || 'Invalid date range.');
@@ -44,6 +58,24 @@ export default function ExportPanel() {
       <h3 className="text-base font-medium text-gray-700 dark:text-gray-200 mb-4">Export Reports</h3>
 
       <div className="flex flex-wrap items-end gap-4 mb-4">
+        <div>
+          <label htmlFor="export-product" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Product
+          </label>
+          <select
+            id="export-product"
+            value={selectedProductId}
+            onChange={(e) => setSelectedProductId(e.target.value)}
+            className="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          >
+            <option value="">Select a product</option>
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.product_code} — {p.product_name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <label htmlFor="export-start" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
             Start Date
@@ -79,7 +111,7 @@ export default function ExportPanel() {
       <div className="flex gap-3">
         <button
           onClick={handleDownload}
-          disabled={downloading}
+          disabled={downloading || !selectedProductId}
           className="bg-primary text-white text-sm px-4 py-2 rounded-md hover:bg-primary-dark transition-colors disabled:opacity-60"
         >
           {downloading ? 'Downloading...' : 'Download Report (.xlsx)'}

@@ -11,44 +11,44 @@ from src.models.rework_history import ReworkHistory
 from src.utils.timezone import utc_to_ist
 
 
-def generate_scan_records_excel(db: Session, start: date, end: date) -> io.BytesIO:
+def generate_scan_records_excel(db: Session, start: date, end: date, product_id: str = None) -> io.BytesIO:
     """Generate Excel workbook with scan records sheet."""
     output = io.BytesIO()
     wb = xlsxwriter.Workbook(output, {"in_memory": True})
 
-    _write_scan_sheet(wb, db, start, end)
+    _write_scan_sheet(wb, db, start, end, product_id)
 
     wb.close()
     output.seek(0)
     return output
 
 
-def generate_rework_history_excel(db: Session, start: date, end: date) -> io.BytesIO:
+def generate_rework_history_excel(db: Session, start: date, end: date, product_id: str = None) -> io.BytesIO:
     """Generate Excel workbook with rework/COPQ sheet."""
     output = io.BytesIO()
     wb = xlsxwriter.Workbook(output, {"in_memory": True})
 
-    _write_copq_sheet(wb, db, start, end)
+    _write_copq_sheet(wb, db, start, end, product_id)
 
     wb.close()
     output.seek(0)
     return output
 
 
-def generate_two_sheet_report(db: Session, start: date, end: date) -> io.BytesIO:
+def generate_two_sheet_report(db: Session, start: date, end: date, product_id: str = None) -> io.BytesIO:
     """Generate Excel workbook with both scan records and COPQ summary sheets."""
     output = io.BytesIO()
     wb = xlsxwriter.Workbook(output, {"in_memory": True})
 
-    _write_scan_sheet(wb, db, start, end)
-    _write_copq_sheet(wb, db, start, end)
+    _write_scan_sheet(wb, db, start, end, product_id)
+    _write_copq_sheet(wb, db, start, end, product_id)
 
     wb.close()
     output.seek(0)
     return output
 
 
-def _write_scan_sheet(wb, db: Session, start: date, end: date):
+def _write_scan_sheet(wb, db: Session, start: date, end: date, product_id: str = None):
     """Write detailed scan records sheet."""
     ws = wb.add_worksheet("Detailed Scans")
 
@@ -77,12 +77,13 @@ def _write_scan_sheet(wb, db: Session, start: date, end: date):
     start_dt = datetime(start.year, start.month, start.day)
     end_dt = datetime(end.year, end.month, end.day, 23, 59, 59)
 
-    scans = (
+    q = (
         db.query(ScanRecord)
         .filter(ScanRecord.scan_timestamp >= start_dt, ScanRecord.scan_timestamp <= end_dt)
-        .order_by(ScanRecord.scan_timestamp.asc())
-        .all()
     )
+    if product_id:
+        q = q.join(WorkOrder, ScanRecord.work_order_id == WorkOrder.id).filter(WorkOrder.product_id == product_id)
+    scans = q.order_by(ScanRecord.scan_timestamp.asc()).all()
 
     row = 1
     for s in scans:
@@ -113,7 +114,7 @@ def _write_scan_sheet(wb, db: Session, start: date, end: date):
         row += 1
 
 
-def _write_copq_sheet(wb, db: Session, start: date, end: date):
+def _write_copq_sheet(wb, db: Session, start: date, end: date, product_id: str = None):
     """Write COPQ summary sheet."""
     ws = wb.add_worksheet("COPQ Summary")
 
@@ -149,7 +150,7 @@ def _write_copq_sheet(wb, db: Session, start: date, end: date):
 
     for s in stages:
         # Rejected scans
-        rejected_count = (
+        rejected_q = (
             db.query(ScanRecord)
             .filter(
                 ScanRecord.stage_id == s.id,
@@ -157,11 +158,13 @@ def _write_copq_sheet(wb, db: Session, start: date, end: date):
                 ScanRecord.scan_timestamp >= start_dt,
                 ScanRecord.scan_timestamp <= end_dt,
             )
-            .count()
         )
+        if product_id:
+            rejected_q = rejected_q.join(WorkOrder, ScanRecord.work_order_id == WorkOrder.id).filter(WorkOrder.product_id == product_id)
+        rejected_count = rejected_q.count()
 
         # Active rework entries with work order info
-        rework_entries = (
+        rework_q = (
             db.query(ReworkHistory)
             .filter(
                 ReworkHistory.stage_id == s.id,
@@ -169,9 +172,10 @@ def _write_copq_sheet(wb, db: Session, start: date, end: date):
                 ReworkHistory.rework_date >= start_dt,
                 ReworkHistory.rework_date <= end_dt,
             )
-            .order_by(ReworkHistory.rework_date.asc())
-            .all()
         )
+        if product_id:
+            rework_q = rework_q.join(WorkOrder, ReworkHistory.work_order_id == WorkOrder.id).filter(WorkOrder.product_id == product_id)
+        rework_entries = rework_q.order_by(ReworkHistory.rework_date.asc()).all()
 
         reworked_count = len(rework_entries)
         stage_cost = sum(float(r.copq_cost) for r in rework_entries)

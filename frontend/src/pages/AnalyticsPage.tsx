@@ -3,17 +3,15 @@ import { useWebSocketSubscribe } from '../context/WebSocketContext.tsx';
 import {
   getDashboard,
   getOperatorPerformance,
-  getOperatorStageMatrix,
 } from '../services/analytics.ts';
+import { listProducts } from '../services/config.ts';
 import type {
   DashboardData,
   OperatorPerformanceEntry,
-  OperatorMatrixRow,
 } from '../types/analytics.ts';
+import type { Product } from '../types/config.ts';
 import ProductionProgressChart from '../components/analytics/ProductionProgressChart.tsx';
-import QualityStatsChart from '../components/analytics/QualityStatsChart.tsx';
 import OperatorPerformanceChart from '../components/analytics/OperatorPerformanceChart.tsx';
-import OperatorStageMatrixTable from '../components/analytics/OperatorStageMatrixTable.tsx';
 import CelebrationOverlay from '../components/analytics/CelebrationOverlay.tsx';
 import ExportPanel from '../components/analytics/ExportPanel.tsx';
 import AIChatWidget from '../components/analytics/AIChatWidget.tsx';
@@ -25,22 +23,27 @@ export default function AnalyticsPage() {
 
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [operators, setOperators] = useState<OperatorPerformanceEntry[]>([]);
-  const [matrix, setMatrix] = useState<OperatorMatrixRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
 
   const prevTargetStatusRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    listProducts().then(setProducts).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function fetchAll() {
       try {
-        const [dashData, opData, matrixData] = await Promise.all([
-          getDashboard(),
-          getOperatorPerformance(),
-          getOperatorStageMatrix(),
+        const pid = selectedProductId || undefined;
+        const [dashData, opData] = await Promise.all([
+          getDashboard(pid),
+          getOperatorPerformance(7, true, pid),
         ]);
         if (cancelled) return;
 
@@ -53,7 +56,6 @@ export default function AnalyticsPage() {
 
         setDashboard(dashData);
         setOperators(opData.operators);
-        setMatrix(matrixData.matrix);
         setError(null);
       } catch {
         if (!cancelled) setError('Failed to load analytics data.');
@@ -69,24 +71,24 @@ export default function AnalyticsPage() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [selectedProductId]);
 
   // Refresh on WebSocket events
   useEffect(() => {
+    const pid = selectedProductId || undefined;
     const unsub1 = subscribe('progress_updated', () => {
-      getDashboard().then(setDashboard).catch(() => {});
+      getDashboard(pid).then(setDashboard).catch(() => {});
     });
     const unsub2 = subscribe('scan_created', () => {
-      Promise.all([getDashboard(), getOperatorPerformance(), getOperatorStageMatrix()])
-        .then(([d, o, m]) => {
+      Promise.all([getDashboard(pid), getOperatorPerformance(7, true, pid)])
+        .then(([d, o]) => {
           setDashboard(d);
           setOperators(o.operators);
-          setMatrix(m.matrix);
         })
         .catch(() => {});
     });
     return () => { unsub1(); unsub2(); };
-  }, [subscribe]);
+  }, [subscribe, selectedProductId]);
 
   if (loading) {
     return (
@@ -114,15 +116,27 @@ export default function AnalyticsPage() {
       {/* AI Chat Widget */}
       <AIChatWidget />
 
+      {/* Product Filter */}
+      <div className="mb-6">
+        <select
+          value={selectedProductId}
+          onChange={(e) => setSelectedProductId(e.target.value)}
+          className="block w-full max-w-xs rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="">All Products</option>
+          {products.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.product_code} — {p.product_name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Row 1: Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <p className="text-3xl font-bold text-primary">{dashboard.today_unique_count}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Unique Assemblies Today</p>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <p className="text-3xl font-bold text-gray-800 dark:text-gray-100">{dashboard.quality_stats.total_scans}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Total Scans</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Total Scans Today</p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <p className={`text-3xl font-bold ${
@@ -134,6 +148,39 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      {/* Stage-wise OK / NOT OK breakdown */}
+      {dashboard.production_progress.stages.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
+          <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-base font-medium text-gray-700 dark:text-gray-200">Stage-wise Quality Summary</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-700 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-5 py-2">Stage</th>
+                  <th className="px-5 py-2 text-center">Total</th>
+                  <th className="px-5 py-2 text-center">OK</th>
+                  <th className="px-5 py-2 text-center">NOT OK</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {[...dashboard.production_progress.stages]
+                  .sort((a, b) => a.stage_sequence - b.stage_sequence)
+                  .map((stage) => (
+                  <tr key={stage.stage_name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-5 py-2 font-medium text-gray-700 dark:text-gray-300">{stage.stage_name}</td>
+                    <td className="px-5 py-2 text-center text-gray-800 dark:text-gray-200 font-semibold">{stage.current_count}</td>
+                    <td className="px-5 py-2 text-center text-green-600 font-semibold">{stage.ok_count}</td>
+                    <td className="px-5 py-2 text-center text-red-600 font-semibold">{stage.not_ok_count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Row 2: Production progress */}
       <div className="mb-6">
         <ProductionProgressChart
@@ -142,22 +189,12 @@ export default function AnalyticsPage() {
         />
       </div>
 
-      {/* Row 3: Quality stats */}
-      <div className="mb-6">
-        <QualityStatsChart stats={dashboard.quality_stats} />
-      </div>
-
       {/* Row 3: Operator performance */}
       <div className="mb-6">
         <OperatorPerformanceChart operators={operators} />
       </div>
 
-      {/* Row 4: Operator x Stage matrix (full width) */}
-      <div className="mb-6">
-        <OperatorStageMatrixTable matrix={matrix} />
-      </div>
-
-      {/* Row 5: Export panel */}
+      {/* Row 4: Export panel */}
       <div className="mb-6">
         <ExportPanel />
       </div>

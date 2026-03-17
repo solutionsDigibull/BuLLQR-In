@@ -19,7 +19,7 @@ def _get_active_product(db: Session):
     return db.query(Product).filter(Product.is_active == True).first()
 
 
-def _stage_progress(db: Session, product: Optional[Product]):
+def _stage_progress(db: Session, product: Optional[Product], today_only: bool = False):
     # Use product-specific stages in product-specific sequence order when available
     if product:
         rows = (
@@ -43,11 +43,19 @@ def _stage_progress(db: Session, product: Optional[Product]):
             for s in db.query(ProductionStage).order_by(ProductionStage.stage_sequence).all()
         ]
 
+    # Calculate today's start timestamp for filtering
+    today_start = None
+    if today_only:
+        today = datetime.utcnow().date()
+        today_start = datetime(today.year, today.month, today.day)
+
     result = []
     for s, seq in stages:
         q = db.query(ScanRecord).filter(ScanRecord.stage_id == s.id)
         if product:
             q = q.join(WorkOrder).filter(WorkOrder.product_id == product.id)
+        if today_start:
+            q = q.filter(ScanRecord.scan_timestamp >= today_start)
         total = q.count()
         ok = q.filter(ScanRecord.quality_status.in_(['ok', 'ok_update'])).count()
         not_ok = total - ok
@@ -66,9 +74,9 @@ def _stage_progress(db: Session, product: Optional[Product]):
 
 @router.get("/progress")
 async def get_production_progress(db: Session = Depends(get_db)):
-    """Production progress for all stages."""
+    """Production progress for all stages (current day only)."""
     product = _get_active_product(db)
-    stages = _stage_progress(db, product)
+    stages = _stage_progress(db, product, today_only=True)
     target_status = product.target_status if product else "not_set"
     total = sum(s["current_count"] for s in stages)
     target = sum(s["target_count"] for s in stages)
@@ -80,17 +88,30 @@ async def get_production_progress(db: Session = Depends(get_db)):
 
 
 @router.get("/dashboard")
-async def get_dashboard(db: Session = Depends(get_db)):
-    """Combined dashboard data."""
-    product = _get_active_product(db)
-    stages = _stage_progress(db, product)
+async def get_dashboard(
+    product_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Combined dashboard data (current day scans)."""
+    if product_id:
+        product = db.query(Product).filter(Product.id == product_id).first()
+    else:
+        product = _get_active_product(db)
+    stages = _stage_progress(db, product, today_only=True)
     target_status = product.target_status if product else "not_set"
     total = sum(s["current_count"] for s in stages)
     target = sum(s["target_count"] for s in stages)
 
-    # Quality stats
-    total_scans = db.query(ScanRecord).count()
-    ok_count = db.query(ScanRecord).filter(
+    # Today's date boundary
+    today = datetime.utcnow().date()
+    today_start = datetime(today.year, today.month, today.day)
+
+    # Quality stats — today only
+    today_scans_q = db.query(ScanRecord).filter(ScanRecord.scan_timestamp >= today_start)
+    if product:
+        today_scans_q = today_scans_q.join(WorkOrder).filter(WorkOrder.product_id == product.id)
+    total_scans = today_scans_q.count()
+    ok_count = today_scans_q.filter(
         ScanRecord.quality_status.in_(['ok', 'ok_update'])
     ).count()
     not_ok_count = total_scans - ok_count
@@ -107,8 +128,6 @@ async def get_dashboard(db: Session = Depends(get_db)):
             total_copq += float(cost.cost_per_rework)
 
     # Today unique WO
-    today = datetime.utcnow().date()
-    today_start = datetime(today.year, today.month, today.day)
     today_unique = db.query(func.count(func.distinct(ScanRecord.work_order_id))).filter(
         ScanRecord.scan_timestamp >= today_start
     ).scalar() or 0
@@ -138,10 +157,16 @@ async def get_dashboard(db: Session = Depends(get_db)):
 @router.get("/operator-performance")
 async def get_operator_performance(
     days: int = Query(7, ge=1, le=365),
+    today_only: bool = Query(False),
+    product_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Operator performance breakdown (operators only, excludes supervisors/QIs/admins)."""
-    since = datetime.utcnow() - timedelta(days=days)
+    if today_only:
+        today = datetime.utcnow().date()
+        since = datetime(today.year, today.month, today.day)
+    else:
+        since = datetime.utcnow() - timedelta(days=days)
     operators = db.query(Operator).filter(
         Operator.is_active == True,
         Operator.role == "operator",
@@ -152,17 +177,22 @@ async def get_operator_performance(
     for op in operators:
         stage_entries = []
         for s in stages:
-            total = db.query(ScanRecord).filter(
+            total_q = db.query(ScanRecord).filter(
                 ScanRecord.operator_id == op.id,
                 ScanRecord.stage_id == s.id,
                 ScanRecord.scan_timestamp >= since,
-            ).count()
-            ok = db.query(ScanRecord).filter(
+            )
+            ok_q = db.query(ScanRecord).filter(
                 ScanRecord.operator_id == op.id,
                 ScanRecord.stage_id == s.id,
                 ScanRecord.scan_timestamp >= since,
                 ScanRecord.quality_status.in_(['ok', 'ok_update']),
-            ).count()
+            )
+            if product_id:
+                total_q = total_q.join(WorkOrder).filter(WorkOrder.product_id == product_id)
+                ok_q = ok_q.join(WorkOrder).filter(WorkOrder.product_id == product_id)
+            total = total_q.count()
+            ok = ok_q.count()
             stage_entries.append({
                 "stage_name": s.stage_name,
                 "scan_count": total,
@@ -312,6 +342,7 @@ async def download_report(
     report_type: str,
     start_date: str = Query(...),
     end_date: str = Query(...),
+    product_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(require_role("supervisor", "admin")),
 ):
@@ -326,13 +357,13 @@ async def download_report(
     ed = date.fromisoformat(end_date)
 
     if report_type == "scans":
-        output = generate_scan_records_excel(db, sd, ed)
+        output = generate_scan_records_excel(db, sd, ed, product_id)
         filename = f"scan_records_{start_date}_{end_date}.xlsx"
     elif report_type == "rework":
-        output = generate_rework_history_excel(db, sd, ed)
+        output = generate_rework_history_excel(db, sd, ed, product_id)
         filename = f"rework_history_{start_date}_{end_date}.xlsx"
     elif report_type == "combined":
-        output = generate_two_sheet_report(db, sd, ed)
+        output = generate_two_sheet_report(db, sd, ed, product_id)
         filename = f"production_report_{start_date}_{end_date}.xlsx"
     else:
         from fastapi import HTTPException

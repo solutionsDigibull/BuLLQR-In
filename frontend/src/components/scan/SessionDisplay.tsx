@@ -5,6 +5,7 @@ import { formatISTTime } from '../../utils/timezone.ts';
 interface SessionDisplayProps {
   scans: ScanRecord[];
   highlightIds?: Set<string>;
+  totalCount?: number;
 }
 
 function statusBadge(status: string) {
@@ -23,7 +24,7 @@ function statusBadge(status: string) {
   );
 }
 
-export default function SessionDisplay({ scans, highlightIds }: SessionDisplayProps) {
+export default function SessionDisplay({ scans, highlightIds, totalCount }: SessionDisplayProps) {
   const tableRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to top when new scans arrive
@@ -73,7 +74,7 @@ export default function SessionDisplay({ scans, highlightIds }: SessionDisplayPr
                 }`}
               >
                 <td className="px-4 py-2 font-mono text-gray-600 dark:text-gray-400">
-                  {String(scans.length - index).padStart(5, '0')}
+                  {String((totalCount ?? scans.length) - index).padStart(5, '0')}
                 </td>
                 <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300 max-w-[180px] truncate">
                   {scan.work_order_code}

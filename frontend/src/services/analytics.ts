@@ -13,17 +13,23 @@ export async function getProductionProgress(): Promise<ProductionProgress> {
   return response.data;
 }
 
-export async function getDashboard(): Promise<DashboardData> {
-  const response = await api.get<DashboardData>('/analytics/dashboard');
+export async function getDashboard(productId?: string): Promise<DashboardData> {
+  const params: Record<string, string> = {};
+  if (productId) params.product_id = productId;
+  const response = await api.get<DashboardData>('/analytics/dashboard', { params });
   return response.data;
 }
 
 export async function getOperatorPerformance(
   days: number = 7,
+  todayOnly: boolean = false,
+  productId?: string,
 ): Promise<OperatorPerformance> {
+  const params: Record<string, string | number | boolean> = { days, today_only: todayOnly };
+  if (productId) params.product_id = productId;
   const response = await api.get<OperatorPerformance>(
     '/analytics/operator-performance',
-    { params: { days } },
+    { params },
   );
   return response.data;
 }
@@ -59,9 +65,12 @@ export async function downloadReport(
   type: 'scans' | 'rework' | 'combined',
   startDate: string,
   endDate: string,
+  productId?: string,
 ): Promise<void> {
+  const params: Record<string, string> = { start_date: startDate, end_date: endDate };
+  if (productId) params.product_id = productId;
   const response = await api.get(`/analytics/reports/${type}`, {
-    params: { start_date: startDate, end_date: endDate },
+    params,
     responseType: 'blob',
   });
   const blob = new Blob([response.data], {

@@ -155,17 +155,21 @@ export async function completeTarget(): Promise<void> {
 }
 
 // Export
-export async function generateReports(startDate?: string, endDate?: string): Promise<Blob> {
+export async function generateReports(startDate?: string, endDate?: string, productId?: string): Promise<Blob> {
+  const params: Record<string, string | undefined> = { start_date: startDate, end_date: endDate };
+  if (productId) params.product_id = productId;
   const response = await api.post('/export/generate-reports', null, {
-    params: { start_date: startDate, end_date: endDate },
+    params,
     responseType: 'blob',
   });
   return response.data;
 }
 
-export async function downloadReports(startDate?: string, endDate?: string): Promise<Blob> {
+export async function downloadReports(startDate?: string, endDate?: string, productId?: string): Promise<Blob> {
+  const params: Record<string, string | undefined> = { start_date: startDate, end_date: endDate };
+  if (productId) params.product_id = productId;
   const response = await api.get('/export/download-reports', {
-    params: { start_date: startDate, end_date: endDate },
+    params,
     responseType: 'blob',
   });
   return response.data;

@@ -61,7 +61,10 @@ async def get_latest_scans(
             "created_at": s.created_at.isoformat() if s.created_at else None,
         })
 
-    total_count = db.query(ScanRecord).count()
+    count_q = db.query(func.count(ScanRecord.id))
+    if stage_id:
+        count_q = count_q.filter(ScanRecord.stage_id == stage_id)
+    total_count = count_q.scalar() or 0
     return {"scans": result, "total_count": total_count}
 
 

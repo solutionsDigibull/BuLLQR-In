@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api/v1/export", tags=["export"])
 async def generate_reports(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
+    product_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(require_role("supervisor", "admin")),
 ):
@@ -22,7 +23,7 @@ async def generate_reports(
     sd = date.fromisoformat(start_date) if start_date else date(2020, 1, 1)
     ed = date.fromisoformat(end_date) if end_date else date.today()
 
-    output = generate_two_sheet_report(db, sd, ed)
+    output = generate_two_sheet_report(db, sd, ed, product_id)
     filename = f"production_report_{sd.isoformat()}_{ed.isoformat()}.xlsx"
 
     return StreamingResponse(
@@ -36,6 +37,7 @@ async def generate_reports(
 async def download_reports(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
+    product_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(require_role("supervisor", "admin")),
 ):
@@ -43,7 +45,7 @@ async def download_reports(
     sd = date.fromisoformat(start_date) if start_date else date(2020, 1, 1)
     ed = date.fromisoformat(end_date) if end_date else date.today()
 
-    output = generate_two_sheet_report(db, sd, ed)
+    output = generate_two_sheet_report(db, sd, ed, product_id)
     filename = f"production_report_{sd.isoformat()}_{ed.isoformat()}.xlsx"
 
     return StreamingResponse(

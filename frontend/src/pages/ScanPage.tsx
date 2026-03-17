@@ -83,6 +83,7 @@ export default function ScanPage() {
 
   // Session state
   const [recentScans, setRecentScans] = useState<ScanRecord[]>([]);
+  const [stageTotalCount, setStageTotalCount] = useState(0);
   const [todayCount, setTodayCount] = useState(0);
   const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
   const highlightTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -176,12 +177,16 @@ export default function ScanPage() {
   useEffect(() => {
     if (!selectedStageId) {
       setRecentScans([]);
+      setStageTotalCount(0);
       setTodayCount(0);
       return;
     }
     scanService
-      .getLatestScans(100, selectedStageId)
-      .then((data) => setRecentScans(data.scans))
+      .getLatestScans(30, selectedStageId)
+      .then((data) => {
+        setRecentScans(data.scans);
+        setStageTotalCount(data.total_count);
+      })
       .catch(() => {});
     scanService
       .getTodayCount(selectedStageId)
@@ -238,7 +243,8 @@ export default function ScanPage() {
     return subscribe('scan_created', (payload) => {
       const scan = payload as ScanRecord;
       if (scan.stage_id !== selectedStageIdRef.current) return;
-      setRecentScans((prev) => [scan, ...prev].slice(0, 100));
+      setRecentScans((prev) => [scan, ...prev].slice(0, 30));
+      setStageTotalCount((prev) => prev + 1);
       setTodayCount((prev) => prev + 1);
       addHighlight(scan.id);
     });
@@ -578,7 +584,7 @@ export default function ScanPage() {
       )}
 
       {/* Recent Scans */}
-      <SessionDisplay scans={recentScans} highlightIds={highlightIds} />
+      <SessionDisplay scans={recentScans} highlightIds={highlightIds} totalCount={stageTotalCount} />
     </div>
   );
 }
