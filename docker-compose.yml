@@ -8,8 +8,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-cats_db}
       POSTGRES_USER: ${POSTGRES_USER:-cats_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cats_password}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -35,8 +35,8 @@ services:
       TIMEZONE: ${TIMEZONE:-Asia/Kolkata}
       SA_PASSWORD: ${SA_PASSWORD:-admin123}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
+    expose:
+      - "8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -52,8 +52,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    ports:
-      - "${FRONTEND_PORT:-80}:80"
+    expose:
+      - "80"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
       interval: 30s
