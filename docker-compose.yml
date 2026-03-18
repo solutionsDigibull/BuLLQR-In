@@ -52,20 +52,13 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    expose:
-      - "80"
-    networks:
-      - default
-      - coolify
+    ports:
+      - "3000:80"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
       interval: 30s
       timeout: 5s
       retries: 3
-
-networks:
-  coolify:
-    external: true
 
 volumes:
   postgres_data:
