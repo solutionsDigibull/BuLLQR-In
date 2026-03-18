@@ -54,11 +54,18 @@ services:
         condition: service_healthy
     expose:
       - "80"
+    networks:
+      - default
+      - coolify
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
       interval: 30s
       timeout: 5s
       retries: 3
+
+networks:
+  coolify:
+    external: true
 
 volumes:
   postgres_data:
