@@ -90,7 +90,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} noValidate className="space-y-5">
           {serverError && (
-            <div className="bg-red-50 text-danger text-sm p-3 rounded-md border border-red-200" role="alert">
+            <div className="bg-red-50 dark:bg-red-900/30 text-danger text-sm p-3 rounded-md border border-red-200 dark:border-red-800" role="alert">
               {serverError}
             </div>
           )}

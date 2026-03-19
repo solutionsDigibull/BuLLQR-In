@@ -535,7 +535,7 @@ export default function ScanPage() {
 
         {/* First article notice */}
         {firstArticleNotice && (
-          <div className="flex items-center gap-2 text-sm bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2.5 rounded-md">
+          <div className="flex items-center gap-2 text-sm bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 px-4 py-2.5 rounded-md">
             <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
             </svg>
@@ -555,8 +555,8 @@ export default function ScanPage() {
         />
 
         {scannedBarcode && flowState !== 'idle' && (
-          <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-2 rounded-md">
-            <span className="font-mono font-medium text-gray-700">{scannedBarcode}</span>
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-md">
+            <span className="font-mono font-medium text-gray-700 dark:text-gray-200">{scannedBarcode}</span>
             <button
               type="button"
               onClick={resetScanFlow}

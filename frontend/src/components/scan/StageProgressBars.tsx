@@ -13,8 +13,8 @@ export default function StageProgressBars({
 }: StageProgressBarsProps) {
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-        <h3 className="text-base font-medium text-gray-700 mb-3">Production Progress</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <h3 className="text-base font-medium text-gray-700 dark:text-gray-200 mb-3">Production Progress</h3>
         <p className="text-sm text-gray-400">Loading progress...</p>
       </div>
     );
@@ -22,23 +22,23 @@ export default function StageProgressBars({
 
   if (stages.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-        <h3 className="text-base font-medium text-gray-700 mb-3">Production Progress</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <h3 className="text-base font-medium text-gray-700 dark:text-gray-200 mb-3">Production Progress</h3>
         <p className="text-sm text-gray-400">No progress data available.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-medium text-gray-700">Production Progress</h3>
+        <h3 className="text-base font-medium text-gray-700 dark:text-gray-200">Production Progress</h3>
         {targetStatus !== 'not_set' && (
           <span
             className={`text-xs font-medium px-2 py-0.5 rounded ${
               targetStatus === 'completed'
-                ? 'bg-green-100 text-green-700'
-                : 'bg-blue-100 text-blue-700'
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
             }`}
           >
             Target: {targetStatus === 'completed' ? 'Completed' : 'In Progress'}
@@ -54,10 +54,10 @@ export default function StageProgressBars({
           return (
             <div key={stage.stage_name}>
               <div className="flex items-center justify-between text-sm mb-1">
-                <span className="font-medium text-gray-700">
+                <span className="font-medium text-gray-700 dark:text-gray-200">
                   {stage.stage_sequence}. {stage.stage_name}
                 </span>
-                <span className="text-gray-500 text-xs tabular-nums">
+                <span className="text-gray-500 dark:text-gray-400 text-xs tabular-nums">
                   {stage.current_count}
                   {hasTarget ? ` / ${stage.target_count}` : ''}
                   {stage.not_ok_count > 0 && (
@@ -67,7 +67,7 @@ export default function StageProgressBars({
                   )}
                 </span>
               </div>
-              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                 {hasTarget ? (
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${

@@ -47,11 +47,11 @@ export default function ExportPanel() {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-2 rounded text-sm">{error}
-          <button onClick={() => setError('')} className="ml-2 text-red-500">&times;</button>
+        <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 px-4 py-2 rounded text-sm">{error}
+          <button onClick={() => setError('')} className="ml-2 text-red-500 dark:text-red-400">&times;</button>
         </div>
       )}
-      {message && <div className="bg-green-50 text-green-700 px-4 py-2 rounded text-sm">{message}</div>}
+      {message && <div className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 px-4 py-2 rounded text-sm">{message}</div>}
 
       <h3 className="text-base font-medium text-gray-700 dark:text-gray-200">Export Reports</h3>
       <p className="text-sm text-gray-500 dark:text-gray-400">

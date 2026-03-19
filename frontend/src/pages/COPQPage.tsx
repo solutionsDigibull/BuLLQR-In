@@ -142,8 +142,8 @@ export default function COPQPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-2 rounded text-sm">{error}
-          <button onClick={() => setError('')} className="ml-2 text-red-500">&times;</button>
+        <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 px-4 py-2 rounded text-sm">{error}
+          <button onClick={() => setError('')} className="ml-2 text-red-500 dark:text-red-400">&times;</button>
         </div>
       )}
 
@@ -151,13 +151,13 @@ export default function COPQPage() {
       <div className="flex gap-3 items-end">
         <div>
           <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Start Date</label>
-          <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="border rounded px-2 py-1.5 text-sm" />
+          <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} className="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-2 py-1.5 text-sm" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">End Date</label>
-          <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="border rounded px-2 py-1.5 text-sm" />
+          <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} className="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-2 py-1.5 text-sm" />
         </div>
-        <button onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }} className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200">
+        <button onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }} className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
           Clear
         </button>
       </div>
@@ -187,22 +187,22 @@ export default function COPQPage() {
                       <th className="px-3 py-2">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                     {cables.map((c) => (
-                      <tr key={c.scan_id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 font-mono text-xs">{c.serial_number || '—'}</td>
-                        <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">{c.work_order_code}</td>
-                        <td className="px-3 py-2">{c.stage_name}</td>
-                        <td className="px-3 py-2 text-gray-600">{c.operator_name}</td>
-                        <td className="px-3 py-2 text-xs text-gray-500">{formatIST(c.scan_timestamp)}</td>
+                      <tr key={c.scan_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="px-3 py-2 font-mono text-xs text-gray-800 dark:text-gray-200">{c.serial_number || '—'}</td>
+                        <td className="px-3 py-2 font-mono text-xs whitespace-nowrap text-gray-800 dark:text-gray-200">{c.work_order_code}</td>
+                        <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{c.stage_name}</td>
+                        <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{c.operator_name}</td>
+                        <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{formatIST(c.scan_timestamp)}</td>
                         <td className="px-3 py-2">
-                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800">
+                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
                             {c.quality_status.replace(/_/g, ' ').toUpperCase()}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-xs">{c.rework_detail || <span className="text-gray-300">None</span>}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{c.rework_copq_cost != null ? c.rework_copq_cost.toFixed(2) : '—'}</td>
-                        <td className="px-3 py-2 text-xs text-gray-500 max-w-[200px] truncate" title={c.rework_notes || ''}>{c.rework_notes || <span className="text-gray-300">—</span>}</td>
+                        <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300">{c.rework_detail || <span className="text-gray-300 dark:text-gray-600">None</span>}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-gray-800 dark:text-gray-200">{c.rework_copq_cost != null ? c.rework_copq_cost.toFixed(2) : '—'}</td>
+                        <td className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 max-w-[200px] truncate" title={c.rework_notes || ''}>{c.rework_notes || <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
                         <td className="px-3 py-2">
                           <button
                             onClick={() => openReworkModal(c)}
@@ -217,11 +217,11 @@ export default function COPQPage() {
                 </table>
               </div>
               {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t">
-                  <span className="text-xs text-gray-500">Page {page} of {totalPages} ({total} total)</span>
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Page {page} of {totalPages} ({total} total)</span>
                   <div className="flex gap-2">
-                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-2 py-1 text-xs border rounded disabled:opacity-50">Prev</button>
-                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-2 py-1 text-xs border rounded disabled:opacity-50">Next</button>
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 rounded disabled:opacity-50">Prev</button>
+                    <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 rounded disabled:opacity-50">Next</button>
                   </div>
                 </div>
               )}
@@ -263,14 +263,14 @@ export default function COPQPage() {
                       <th className="px-4 py-2">Rework Breakdown</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                     {summary.by_stage.map((s) => (
-                      <tr key={s.stage_name} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 font-medium">{s.stage_name}</td>
-                        <td className="px-4 py-2 text-red-600">{s.rejection_count}</td>
-                        <td className="px-4 py-2 text-orange-600">{s.reworked_count}</td>
-                        <td className="px-4 py-2 font-mono">{s.total_copq_cost.toFixed(2)}</td>
-                        <td className="px-4 py-2 text-xs text-gray-500">
+                      <tr key={s.stage_name} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-200">{s.stage_name}</td>
+                        <td className="px-4 py-2 text-red-600 dark:text-red-400">{s.rejection_count}</td>
+                        <td className="px-4 py-2 text-orange-600 dark:text-orange-400">{s.reworked_count}</td>
+                        <td className="px-4 py-2 font-mono text-gray-800 dark:text-gray-200">{s.total_copq_cost.toFixed(2)}</td>
+                        <td className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
                           {s.rework_details.length > 0
                             ? s.rework_details.map((d) => `${d.rework_detail} (${d.count})`).join(', ')
                             : '—'}
@@ -294,16 +294,16 @@ export default function COPQPage() {
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
               {selectedCable.rework_history_id ? 'Change Rework Type' : 'Apply Rework'}
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               WO: <span className="font-mono">{selectedCable.work_order_code}</span> | Stage: {selectedCable.stage_name}
             </p>
 
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Rework Type</label>
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Rework Type</label>
               <select
                 value={selectedConfigId}
                 onChange={(e) => setSelectedConfigId(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-3 py-2 text-sm"
               >
                 <option value="">Select rework type...</option>
                 {reworkConfigs.map((rc) => (
@@ -315,11 +315,11 @@ export default function COPQPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Notes (optional)</label>
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Notes (optional)</label>
               <textarea
                 value={reworkNotes}
                 onChange={(e) => setReworkNotes(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-3 py-2 text-sm"
                 rows={2}
               />
             </div>
@@ -327,15 +327,15 @@ export default function COPQPage() {
             {/* Rework History */}
             {selectedCable.rework_history_id && (
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">History</label>
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">History</label>
                 {historyLoading ? (
                   <p className="text-xs text-gray-400">Loading history...</p>
                 ) : reworkHistory.length > 0 ? (
-                  <div className="max-h-36 overflow-y-auto border rounded bg-gray-50 divide-y divide-gray-200">
+                  <div className="max-h-36 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-600">
                     {reworkHistory.map((h) => (
                       <div key={h.id} className="px-3 py-2 text-xs">
                         <div className="flex justify-between">
-                          <span className="font-medium text-gray-700">{h.rework_detail}</span>
+                          <span className="font-medium text-gray-700 dark:text-gray-200">{h.rework_detail}</span>
                           <span className="text-gray-400">{h.rework_date ? formatIST(h.rework_date) : '—'}</span>
                         </div>
                         <div className="text-gray-500 mt-0.5">
@@ -354,7 +354,7 @@ export default function COPQPage() {
             )}
 
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowReworkModal(false)} className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200">
+              <button onClick={() => setShowReworkModal(false)} className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded hover:bg-gray-200 dark:hover:bg-gray-600">
                 Cancel
               </button>
               <button

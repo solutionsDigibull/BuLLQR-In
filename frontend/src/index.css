@@ -3,19 +3,78 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-primary: #2196F3;
-  --color-primary-dark: #1976D2;
-  --color-primary-light: #BBDEFB;
-  --color-success: #4CAF50;
-  --color-danger: #F44336;
-  --color-warning: #FF9800;
-  --color-sidebar: #1E293B;
-  --color-sidebar-hover: #334155;
+  --color-primary: #3B82F6;
+  --color-primary-dark: #2563EB;
+  --color-primary-light: #BFDBFE;
+  --color-success: #22C55E;
+  --color-danger: #EF4444;
+  --color-warning: #F59E0B;
+  --color-sidebar: #0F172A;
+  --color-sidebar-hover: #1E293B;
 }
 
+/* ── Dark mode base styles for native inputs ── */
+.dark input[type="date"],
+.dark input[type="datetime-local"],
+.dark input[type="time"],
+.dark select {
+  background-color: #1E293B;
+  color: #E2E8F0;
+  border-color: #475569;
+  color-scheme: dark;
+}
+
+.dark input[type="date"]:focus,
+.dark input[type="datetime-local"]:focus,
+.dark input[type="time"]:focus,
+.dark select:focus {
+  border-color: #3B82F6;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+/* ── Improved placeholder contrast ── */
+.dark ::placeholder {
+  color: #94A3B8;
+  opacity: 1;
+}
+
+/* ── Scrollbar styling for dark mode ── */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1E293B;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748B;
+}
+
+/* ── Animations ── */
 @keyframes scan-highlight {
   0% {
-    background-color: #BBDEFB;
+    background-color: #BFDBFE;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.dark .animate-scan-highlight {
+  animation: scan-highlight-dark 2s ease-out;
+}
+
+@keyframes scan-highlight-dark {
+  0% {
+    background-color: rgba(59, 130, 246, 0.2);
   }
   100% {
     background-color: transparent;

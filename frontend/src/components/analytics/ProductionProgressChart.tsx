@@ -10,14 +10,15 @@ import {
   LabelList,
 } from 'recharts';
 import type { StageProgress } from '../../types/analytics.ts';
+import { useTheme } from '../../context/ThemeContext.tsx';
 
 interface ProductionProgressChartProps {
   stages: StageProgress[];
   targetStatus: string;
 }
 
-const PRIMARY = '#2196F3';
-const SUCCESS = '#4CAF50';
+const PRIMARY = '#3B82F6';
+const SUCCESS = '#22C55E';
 
 export default function ProductionProgressChart({
   stages,
@@ -26,6 +27,12 @@ export default function ProductionProgressChart({
   if (stages.length === 0) {
     return <p className="text-sm text-gray-400">No progress data available.</p>;
   }
+
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const gridColor = isDark ? '#374151' : '#f0f0f0';
+  const tickColor = isDark ? '#9CA3AF' : '#666';
+  const labelColor = isDark ? '#D1D5DB' : '#555';
 
   const sortedStages = [...stages].sort((a, b) => a.stage_sequence - b.stage_sequence);
 
@@ -48,8 +55,8 @@ export default function ProductionProgressChart({
           <span
             className={`text-xs font-medium px-2 py-0.5 rounded ${
               targetStatus === 'completed'
-                ? 'bg-green-100 text-green-700'
-                : 'bg-blue-100 text-blue-700'
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
             }`}
           >
             {targetStatus === 'completed' ? 'Target Completed' : 'Target In Progress'}
@@ -58,10 +65,16 @@ export default function ProductionProgressChart({
       </div>
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={data} margin={{ top: 20, right: 20, bottom: 60, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={80} />
-          <YAxis tick={{ fontSize: 12 }} />
+          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+          <XAxis dataKey="name" tick={{ fontSize: 11, fill: tickColor }} interval={0} angle={-35} textAnchor="end" height={80} />
+          <YAxis tick={{ fontSize: 12, fill: tickColor }} />
           <Tooltip
+            contentStyle={{
+              backgroundColor: isDark ? '#1F2937' : '#fff',
+              border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              color: isDark ? '#E5E7EB' : '#111',
+            }}
             formatter={(value?: number, name?: string) => [
               value ?? 0,
               name === 'current' ? 'Current' : 'Target',
@@ -77,11 +90,11 @@ export default function ProductionProgressChart({
             <LabelList
               dataKey="label"
               position="top"
-              style={{ fontSize: 11, fill: '#555' }}
+              style={{ fontSize: 11, fill: labelColor }}
               content={({ x, y, width, value, index }: any) => {
                 if (data[index]?.current === 0) return null;
                 return (
-                  <text x={x + width / 2} y={y - 6} textAnchor="middle" fontSize={11} fill="#555">
+                  <text x={x + width / 2} y={y - 6} textAnchor="middle" fontSize={11} fill={labelColor}>
                     {value}
                   </text>
                 );
