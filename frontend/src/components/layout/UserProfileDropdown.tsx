@@ -42,11 +42,8 @@ export default function UserProfileDropdown() {
         aria-expanded={open}
         aria-haspopup="true"
       >
-        <span className="w-8 h-8 rounded-full bg-white text-primary flex items-center justify-center text-xs font-semibold">
-          {initials}
-        </span>
         <svg
-          className={`w-4 h-4 text-white/70 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-5 h-5 text-white/80 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
