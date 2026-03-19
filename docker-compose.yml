@@ -52,25 +52,15 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      - SERVICE_FQDN_FRONTEND_80=http://bullmqr.bullmatrix.ai
     expose:
       - "80"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.bullmqr-frontend.rule=Host(`bullmqr.bullmatrix.ai`)"
-      - "traefik.http.routers.bullmqr-frontend.entrypoints=http"
-      - "traefik.http.services.bullmqr-frontend.loadbalancer.server.port=80"
-    networks:
-      - coolify
-      - default
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
       interval: 30s
       timeout: 5s
       retries: 3
-
-networks:
-  coolify:
-    external: true
 
 volumes:
   postgres_data:
