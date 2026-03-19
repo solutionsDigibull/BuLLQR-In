@@ -86,8 +86,8 @@ export default function StagesManagement() {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-2 rounded text-sm">{error}
-          <button onClick={() => setError('')} className="ml-2 text-red-500 hover:text-red-800">&times;</button>
+        <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 px-4 py-2 rounded text-sm">{error}
+          <button onClick={() => setError('')} className="ml-2 text-red-500 dark:text-red-400 hover:text-red-800">&times;</button>
         </div>
       )}
 
@@ -146,11 +146,11 @@ export default function StagesManagement() {
         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
           {stages.map((s) => (
             <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-              <td className="px-4 py-2 font-medium">{s.stage_name}</td>
+              <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-100">{s.stage_name}</td>
               <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.description || '—'}</td>
               <td className="px-4 py-2 space-x-2">
-                <button onClick={() => startEdit(s)} className="text-primary hover:underline text-xs">Edit</button>
-                <button onClick={() => handleDelete(s.id)} className="text-red-500 hover:underline text-xs">Delete</button>
+                <button onClick={() => startEdit(s)} className="text-primary dark:text-blue-400 hover:underline text-xs">Edit</button>
+                <button onClick={() => handleDelete(s.id)} className="text-red-500 dark:text-red-400 hover:underline text-xs">Delete</button>
               </td>
             </tr>
           ))}

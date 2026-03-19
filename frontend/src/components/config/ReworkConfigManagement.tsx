@@ -75,8 +75,8 @@ export default function ReworkConfigManagement() {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="bg-red-50 text-red-700 px-4 py-2 rounded text-sm">{error}
-          <button onClick={() => setError('')} className="ml-2 text-red-500 hover:text-red-800">&times;</button>
+        <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 px-4 py-2 rounded text-sm">{error}
+          <button onClick={() => setError('')} className="ml-2 text-red-500 dark:text-red-400 hover:text-red-800">&times;</button>
         </div>
       )}
 
@@ -147,20 +147,20 @@ export default function ReworkConfigManagement() {
         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
           {configs.map((rc) => (
             <tr key={rc.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${!rc.is_active ? 'opacity-50' : ''}`}>
-              <td className="px-4 py-2 font-medium">{rc.rework_detail}</td>
-              <td className="px-4 py-2 font-mono">{rc.copq_cost.toFixed(2)}</td>
+              <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-100">{rc.rework_detail}</td>
+              <td className="px-4 py-2 font-mono text-gray-800 dark:text-gray-200">{rc.copq_cost.toFixed(2)}</td>
               <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{rc.description || '—'}</td>
               <td className="px-4 py-2">
-                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${rc.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${rc.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'}`}>
                   {rc.is_active ? 'Active' : 'Inactive'}
                 </span>
               </td>
               <td className="px-4 py-2 space-x-2">
-                <button onClick={() => startEdit(rc)} className="text-primary hover:underline text-xs">Edit</button>
+                <button onClick={() => startEdit(rc)} className="text-primary dark:text-blue-400 hover:underline text-xs">Edit</button>
                 {rc.is_active ? (
-                  <button onClick={() => handleDeactivate(rc.id)} className="text-red-500 hover:underline text-xs">Deactivate</button>
+                  <button onClick={() => handleDeactivate(rc.id)} className="text-red-500 dark:text-red-400 hover:underline text-xs">Deactivate</button>
                 ) : (
-                  <button onClick={() => handleReactivate(rc.id)} className="text-green-600 hover:underline text-xs">Reactivate</button>
+                  <button onClick={() => handleReactivate(rc.id)} className="text-green-600 dark:text-green-400 hover:underline text-xs">Reactivate</button>
                 )}
               </td>
             </tr>
