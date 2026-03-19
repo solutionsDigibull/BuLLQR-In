@@ -45,7 +45,6 @@ export default function UserProfileDropdown() {
         <span className="w-8 h-8 rounded-full bg-white text-primary flex items-center justify-center text-xs font-semibold">
           {initials}
         </span>
-        <span className="text-sm font-medium text-white hidden sm:inline">{user.full_name}</span>
         <svg
           className={`w-4 h-4 text-white/70 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
