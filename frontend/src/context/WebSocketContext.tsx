@@ -32,7 +32,8 @@ const WebSocketContext = createContext<WebSocketContextValue | null>(null);
 // Separate stable context for subscribe — never re-renders on status changes.
 const SubscribeContext = createContext<SubscribeFn | null>(null);
 
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || `ws://${window.location.host}/ws`;
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_BASE_URL = import.meta.env.VITE_WS_URL || `${wsProtocol}//${window.location.host}/ws`;
 const MAX_RECONNECT_DELAY = 30000;
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
