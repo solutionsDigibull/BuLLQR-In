@@ -31,7 +31,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:-change-this-in-production-minimum-32-characters-long}
       ALGORITHM: ${ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_HOURS: ${ACCESS_TOKEN_EXPIRE_HOURS:-8}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:3000,https://bullmqr.bullmatrix.ai,http://bullmqr.bullmatrix.ai}
       TIMEZONE: ${TIMEZONE:-Asia/Kolkata}
       SA_PASSWORD: ${SA_PASSWORD:-admin123}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -52,8 +52,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
       interval: 30s
