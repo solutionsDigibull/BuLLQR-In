@@ -25,13 +25,6 @@ export default function UserProfileDropdown() {
 
   if (!user) return null;
 
-  const initials = user.full_name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-
   const roleLabel = user.role.replace('_', ' ');
 
   return (
