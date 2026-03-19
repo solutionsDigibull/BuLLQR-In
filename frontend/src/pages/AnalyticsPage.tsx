@@ -132,58 +132,67 @@ export default function AnalyticsPage() {
         </select>
       </div>
 
-      {/* Row 1: Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <p className={`text-3xl font-bold ${
-            dashboard.quality_stats.ok_percentage >= 95 ? 'text-green-600' : 'text-orange-600'
-          }`}>
-            {dashboard.quality_stats.ok_percentage.toFixed(1)}%
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Overall OK Rate</p>
-        </div>
-      </div>
+      {/* Product-specific sections — only shown when a product is selected */}
+      {selectedProductId ? (
+        <>
+          {/* Overall OK Rate */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+              <p className={`text-3xl font-bold ${
+                dashboard.quality_stats.ok_percentage >= 95 ? 'text-green-600' : 'text-orange-600'
+              }`}>
+                {dashboard.quality_stats.ok_percentage.toFixed(1)}%
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Overall OK Rate</p>
+            </div>
+          </div>
 
-      {/* Stage-wise OK / NOT OK breakdown */}
-      {dashboard.production_progress.stages.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
-          <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-base font-medium text-gray-700 dark:text-gray-200">Stage-wise Quality Summary</h3>
+          {/* Stage-wise OK / NOT OK breakdown */}
+          {dashboard.production_progress.stages.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
+              <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-base font-medium text-gray-700 dark:text-gray-200">Stage-wise Quality Summary</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-700 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-5 py-2">Stage</th>
+                      <th className="px-5 py-2 text-center">Total</th>
+                      <th className="px-5 py-2 text-center">OK</th>
+                      <th className="px-5 py-2 text-center">NOT OK</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {[...dashboard.production_progress.stages]
+                      .sort((a, b) => a.stage_sequence - b.stage_sequence)
+                      .map((stage) => (
+                      <tr key={stage.stage_name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-5 py-2 font-medium text-gray-700 dark:text-gray-300">{stage.stage_name}</td>
+                        <td className="px-5 py-2 text-center text-gray-800 dark:text-gray-200 font-semibold">{stage.current_count}</td>
+                        <td className="px-5 py-2 text-center text-green-600 font-semibold">{stage.ok_count}</td>
+                        <td className="px-5 py-2 text-center text-red-600 font-semibold">{stage.not_ok_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Production progress */}
+          <div className="mb-6">
+            <ProductionProgressChart
+              stages={dashboard.production_progress.stages}
+              targetStatus={dashboard.production_progress.target_status}
+            />
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-700 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  <th className="px-5 py-2">Stage</th>
-                  <th className="px-5 py-2 text-center">Total</th>
-                  <th className="px-5 py-2 text-center">OK</th>
-                  <th className="px-5 py-2 text-center">NOT OK</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {[...dashboard.production_progress.stages]
-                  .sort((a, b) => a.stage_sequence - b.stage_sequence)
-                  .map((stage) => (
-                  <tr key={stage.stage_name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-5 py-2 font-medium text-gray-700 dark:text-gray-300">{stage.stage_name}</td>
-                    <td className="px-5 py-2 text-center text-gray-800 dark:text-gray-200 font-semibold">{stage.current_count}</td>
-                    <td className="px-5 py-2 text-center text-green-600 font-semibold">{stage.ok_count}</td>
-                    <td className="px-5 py-2 text-center text-red-600 font-semibold">{stage.not_ok_count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        </>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 mb-6 text-center">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Select a product to view quality summary, stage details, and production progress.</p>
         </div>
       )}
-
-      {/* Row 2: Production progress */}
-      <div className="mb-6">
-        <ProductionProgressChart
-          stages={dashboard.production_progress.stages}
-          targetStatus={dashboard.production_progress.target_status}
-        />
-      </div>
 
       {/* Row 3: Operator performance */}
       <div className="mb-6">
