@@ -135,10 +135,6 @@ export default function AnalyticsPage() {
       {/* Row 1: Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <p className="text-3xl font-bold text-gray-800 dark:text-gray-100">{dashboard.quality_stats.total_scans}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Total Scans Today</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <p className={`text-3xl font-bold ${
             dashboard.quality_stats.ok_percentage >= 95 ? 'text-green-600' : 'text-orange-600'
           }`}>
