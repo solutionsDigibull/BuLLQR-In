@@ -269,12 +269,14 @@ export default function ScanPage() {
   }
 
   async function handleBarcodeScanned(barcode: string) {
-    if (!selectedProductId) {
-      setBarcodeError('Please select a product first');
-      return;
-    }
-    if (!selectedStageId) {
-      setBarcodeError('Please select a production stage first');
+    const missing: string[] = [];
+    if (!selectedProductId) missing.push('Product');
+    if (!selectedStageId) missing.push('Production Stage');
+    if (!selectedOperatorId) missing.push('Operator');
+    if (!selectedSupervisorId) missing.push('Supervisor');
+    if (!selectedQiId) missing.push('Quality Inspector');
+    if (missing.length > 0) {
+      setBarcodeError(`Please select: ${missing.join(', ')}`);
       return;
     }
     setBarcodeError('');
@@ -309,8 +311,8 @@ export default function ScanPage() {
   ) {
     if (!user || !selectedStageId || !barcode) return;
 
-    const operatorId = selectedOperatorId || user.id;
-    const qiId = inspectorId || selectedQiId || undefined;
+    const operatorId = selectedOperatorId;
+    const qiId = inspectorId || selectedQiId;
 
     setFlowState('submitting');
     try {
@@ -320,8 +322,8 @@ export default function ScanPage() {
         operator_id: operatorId,
         quality_status: qualityStatus,
         quality_inspector_id: qiId,
-        supervisor_id: selectedSupervisorId || undefined,
-        product_id: selectedProductId || undefined,
+        supervisor_id: selectedSupervisorId,
+        product_id: selectedProductId,
       });
 
       setFeedback({
@@ -384,7 +386,7 @@ export default function ScanPage() {
     setFeedback({ type: null, message: '' });
   }, []);
 
-  const isSetupReady = !!selectedProductId && !!selectedStageId;
+  const isSetupReady = !!selectedProductId && !!selectedStageId && !!selectedOperatorId && !!selectedSupervisorId && !!selectedQiId;
   const showFirstArticle = flowState === 'first_article';
   const isSubmitting = flowState === 'submitting';
 
@@ -459,7 +461,7 @@ export default function ScanPage() {
               disabled={isSubmitting || operatorsLoading}
               className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100 dark:disabled:bg-gray-600"
             >
-              <option value="">{operatorsLoading ? 'Loading...' : `${user?.full_name} (me)`}</option>
+              <option value="">{operatorsLoading ? 'Loading...' : 'Select an operator'}</option>
               {operators.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.full_name}
@@ -483,7 +485,7 @@ export default function ScanPage() {
               disabled={isSubmitting}
               className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100 dark:disabled:bg-gray-600"
             >
-              <option value="">No supervisor</option>
+              <option value="">Select a supervisor</option>
               {supervisors.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.full_name}
@@ -504,7 +506,7 @@ export default function ScanPage() {
               disabled={isSubmitting || qiLoading}
               className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100 dark:disabled:bg-gray-600"
             >
-              <option value="">{qiLoading ? 'Loading...' : 'No inspector'}</option>
+              <option value="">{qiLoading ? 'Loading...' : 'Select an inspector'}</option>
               {qiList.map((qi) => (
                 <option key={qi.id} value={qi.id}>
                   {qi.full_name}
