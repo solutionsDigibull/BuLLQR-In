@@ -2,7 +2,12 @@ import { useWebSocket } from '../../context/WebSocketContext.tsx';
 import { useTheme } from '../../context/ThemeContext.tsx';
 import UserProfileDropdown from './UserProfileDropdown.tsx';
 
-export default function Header() {
+interface HeaderProps {
+  onToggleSidebar?: () => void;
+  sidebarVisible?: boolean;
+}
+
+export default function Header({ onToggleSidebar, sidebarVisible }: HeaderProps) {
   const { status } = useWebSocket();
   const { theme, toggleTheme } = useTheme();
 
@@ -14,9 +19,26 @@ export default function Header() {
         : 'bg-danger';
 
   return (
-    <header className="bg-black h-16 flex items-center justify-between px-6 shrink-0 shadow-md">
+    <header className="bg-black h-20 flex items-center justify-between px-6 shrink-0 shadow-md">
       <div className="flex items-center gap-3">
-        <img src="/bullmqr-logo.png" alt="BuLLMQR" className="h-14" />
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className="p-2 rounded-md text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            title={sidebarVisible ? 'Hide navigation' : 'Show navigation'}
+          >
+            {sidebarVisible ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            )}
+          </button>
+        )}
+        <img src="/bullmqr-logo.png" alt="BuLLMQR" className="h-16" />
       </div>
 
       <div className="flex items-center gap-4">

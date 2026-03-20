@@ -76,7 +76,7 @@ export default function SessionDisplay({ scans, highlightIds, totalCount }: Sess
                 <td className="px-4 py-2 font-mono text-gray-600 dark:text-gray-400">
                   {String((totalCount ?? scans.length) - index).padStart(5, '0')}
                 </td>
-                <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300 max-w-[180px] truncate">
+                <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">
                   {scan.work_order_code}
                 </td>
                 <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{scan.stage_name}</td>
