@@ -10,6 +10,7 @@ from src.models.rework_config import ReworkConfig
 from src.models.rework_history import ReworkHistory
 from src.models.production_target import ProductionTarget
 from src.models.product_stage import ProductStage
+from src.models.stage_sop_file import StageSopFile
 
 __all__ = [
     "Operator",
@@ -23,4 +24,5 @@ __all__ = [
     "ReworkConfig",
     "ReworkHistory",
     "ProductionTarget",
+    "StageSopFile",
 ]

@@ -6,6 +6,7 @@ import StageSelector from '../components/scan/StageSelector.tsx';
 import FirstArticleDialog from '../components/scan/FirstArticleDialog.tsx';
 import ScanFeedback from '../components/scan/ScanFeedback.tsx';
 import SessionDisplay from '../components/scan/SessionDisplay.tsx';
+import SopViewerModal from '../components/scan/SopViewerModal.tsx';
 import * as scanService from '../services/scan.ts';
 import { listProducts, getProductStages, setProductStages } from '../services/config.ts';
 import { formatIST } from '../utils/timezone.ts';
@@ -85,6 +86,9 @@ export default function ScanPage() {
     type: 'success' | 'error' | 'warning' | null;
     message: string;
   }>({ type: null, message: '' });
+
+  // SOP viewer state
+  const [sopViewStageId, setSopViewStageId] = useState<string | null>(null);
 
   // Session state
   const [recentScans, setRecentScans] = useState<ScanRecord[]>([]);
@@ -486,6 +490,7 @@ export default function ScanPage() {
                   if (flowState !== 'idle') resetScanFlow();
                 }}
                 onMandatoryChange={handleMandatoryChange}
+                onViewSop={(id) => setSopViewStageId(id)}
                 stageDefectCounts={stageDefectCounts}
                 loading={stagesLoading}
                 disabled={isSubmitting}
@@ -793,6 +798,15 @@ export default function ScanPage() {
 
       {/* Recent Scans */}
       <SessionDisplay scans={recentScans} highlightIds={highlightIds} totalCount={stageTotalCount} />
+
+      {/* SOP Viewer Modal */}
+      {sopViewStageId && (
+        <SopViewerModal
+          stageId={sopViewStageId}
+          stageName={stages.find((s) => s.id === sopViewStageId)?.stage_name ?? ''}
+          onClose={() => setSopViewStageId(null)}
+        />
+      )}
     </div>
   );
 }

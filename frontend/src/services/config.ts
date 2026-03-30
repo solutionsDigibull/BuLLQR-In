@@ -15,6 +15,7 @@ import type {
   ReworkConfigCreate,
   ReworkConfigUpdate,
   ProductionTargetItem,
+  SopFile,
 } from '../types/config.ts';
 import type { ProductionStage } from '../types/scan.ts';
 
@@ -113,6 +114,29 @@ export async function updateStage(stageId: string, data: StageUpdate): Promise<P
 
 export async function deleteStage(stageId: string, force = false): Promise<void> {
   await api.delete(`/config/stages/${stageId}`, { params: { force } });
+}
+
+// SOP Files
+export async function uploadSopFile(stageId: string, file: File): Promise<SopFile> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await api.post<SopFile>(`/config/stages/${stageId}/sop`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+
+export async function listSopFiles(stageId: string): Promise<SopFile[]> {
+  const response = await api.get<{ files: SopFile[] }>(`/config/stages/${stageId}/sop`);
+  return response.data.files;
+}
+
+export async function deleteSopFile(stageId: string, fileId: string): Promise<void> {
+  await api.delete(`/config/stages/${stageId}/sop/${fileId}`);
+}
+
+export function getSopFileUrl(stageId: string, fileId: string): string {
+  return `/api/v1/config/stages/${stageId}/sop/${fileId}/content`;
 }
 
 // Rework Configs

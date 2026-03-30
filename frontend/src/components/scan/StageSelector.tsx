@@ -5,6 +5,7 @@ interface StageSelectorProps {
   selectedStageId: string;
   onChange: (stageId: string) => void;
   onMandatoryChange?: (stageId: string, isMandatory: boolean) => void;
+  onViewSop?: (stageId: string) => void;
   stageDefectCounts?: Record<string, number>;
   disabled?: boolean;
   loading?: boolean;
@@ -15,6 +16,7 @@ export default function StageSelector({
   selectedStageId,
   onChange,
   onMandatoryChange,
+  onViewSop,
   stageDefectCounts = {},
   disabled = false,
   loading = false,
@@ -47,6 +49,7 @@ export default function StageSelector({
               <th className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 pb-2">Description</th>
               <th className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 pb-2 pl-4 whitespace-nowrap">Mandatory</th>
               <th className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 pb-2 pl-4 whitespace-nowrap">Defects</th>
+              <th className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 pb-2 pl-4 whitespace-nowrap">SOP</th>
             </tr>
           </thead>
           <tbody>
@@ -118,6 +121,22 @@ export default function StageSelector({
                         <span className="text-sm text-gray-400 dark:text-gray-500">—</span>
                       );
                     })()}
+                  </td>
+                  <td
+                    className="py-2.5 pl-4 whitespace-nowrap"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {stage.sop_count > 0 ? (
+                      <button
+                        onClick={() => onViewSop && onViewSop(stage.id)}
+                        className="text-xs font-medium text-blue-500 dark:text-blue-400 hover:underline disabled:opacity-50"
+                        disabled={disabled}
+                      >
+                        View ({stage.sop_count})
+                      </button>
+                    ) : (
+                      <span className="text-sm text-gray-400 dark:text-gray-500">—</span>
+                    )}
                   </td>
                 </tr>
               );

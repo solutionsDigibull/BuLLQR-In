@@ -1,8 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getStages } from '../../services/scan.ts';
-import { createStage, updateStage, deleteStage } from '../../services/config.ts';
+import { createStage, updateStage, deleteStage, uploadSopFile, listSopFiles, deleteSopFile } from '../../services/config.ts';
 import type { ProductionStage } from '../../types/scan.ts';
-import type { StageCreate } from '../../types/config.ts';
+import type { StageCreate, SopFile } from '../../types/config.ts';
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export default function StagesManagement() {
   const [stages, setStages] = useState<ProductionStage[]>([]);
@@ -12,6 +18,13 @@ export default function StagesManagement() {
   const [form, setForm] = useState<{ stage_name: string; description: string }>({ stage_name: '', description: '' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // SOP state
+  const [sopFiles, setSopFiles] = useState<Record<string, SopFile[]>>({});
+  const [sopExpanded, setSopExpanded] = useState<string | null>(null);
+  const [sopUploading, setSopUploading] = useState<Record<string, boolean>>({});
+  const [sopDeleting, setSopDeleting] = useState<Record<string, boolean>>({});
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     loadStages();
@@ -25,6 +38,59 @@ export default function StagesManagement() {
       setError('Failed to load stages');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function expandSop(stageId: string) {
+    if (sopExpanded === stageId) {
+      setSopExpanded(null);
+      return;
+    }
+    setSopExpanded(stageId);
+    if (!sopFiles[stageId]) {
+      try {
+        const files = await listSopFiles(stageId);
+        setSopFiles((prev) => ({ ...prev, [stageId]: files }));
+      } catch {
+        // ignore, will show empty
+        setSopFiles((prev) => ({ ...prev, [stageId]: [] }));
+      }
+    }
+  }
+
+  async function handleSopUpload(stageId: string, file: File) {
+    setSopUploading((prev) => ({ ...prev, [stageId]: true }));
+    try {
+      const uploaded = await uploadSopFile(stageId, file);
+      setSopFiles((prev) => ({
+        ...prev,
+        [stageId]: [...(prev[stageId] ?? []), uploaded],
+      }));
+      // Refresh stage list to update sop_count badge
+      const updated = await getStages();
+      setStages(updated);
+    } catch {
+      setError('Failed to upload SOP file');
+    } finally {
+      setSopUploading((prev) => ({ ...prev, [stageId]: false }));
+    }
+  }
+
+  async function handleSopDelete(stageId: string, fileId: string) {
+    if (!confirm('Delete this SOP file?')) return;
+    setSopDeleting((prev) => ({ ...prev, [fileId]: true }));
+    try {
+      await deleteSopFile(stageId, fileId);
+      setSopFiles((prev) => ({
+        ...prev,
+        [stageId]: (prev[stageId] ?? []).filter((f) => f.id !== fileId),
+      }));
+      const updated = await getStages();
+      setStages(updated);
+    } catch {
+      setError('Failed to delete SOP file');
+    } finally {
+      setSopDeleting((prev) => ({ ...prev, [fileId]: false }));
     }
   }
 
@@ -140,19 +206,86 @@ export default function StagesManagement() {
           <tr className="text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
             <th className="px-4 py-2">Name</th>
             <th className="px-4 py-2">Description</th>
+            <th className="px-4 py-2">SOP</th>
             <th className="px-4 py-2">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
           {stages.map((s) => (
-            <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-              <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-100">{s.stage_name}</td>
-              <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.description || '—'}</td>
-              <td className="px-4 py-2 space-x-2">
-                <button onClick={() => startEdit(s)} className="text-primary dark:text-blue-400 hover:underline text-xs">Edit</button>
-                <button onClick={() => handleDelete(s.id)} className="text-red-500 dark:text-red-400 hover:underline text-xs">Delete</button>
-              </td>
-            </tr>
+            <>
+              <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-100">{s.stage_name}</td>
+                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.description || '—'}</td>
+                <td className="px-4 py-2">
+                  <div className="flex items-center gap-2">
+                    {/* File count badge */}
+                    {s.sop_count > 0 && (
+                      <span className="inline-flex items-center text-xs font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                        {s.sop_count} file{s.sop_count !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {/* Upload button */}
+                    <label className={`cursor-pointer text-xs text-primary dark:text-blue-400 hover:underline ${sopUploading[s.id] ? 'opacity-50 pointer-events-none' : ''}`}>
+                      {sopUploading[s.id] ? 'Uploading...' : 'Upload'}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="text/*,image/*,video/*,.pdf,.doc,.docx"
+                        ref={(el) => { fileInputRefs.current[s.id] = el; }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleSopUpload(s.id, file);
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                    </label>
+                    {/* Manage toggle */}
+                    {s.sop_count > 0 && (
+                      <button
+                        onClick={() => expandSop(s.id)}
+                        className="text-xs text-gray-500 dark:text-gray-400 hover:underline"
+                      >
+                        {sopExpanded === s.id ? 'Hide' : 'Manage'}
+                      </button>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-2 space-x-2">
+                  <button onClick={() => startEdit(s)} className="text-primary dark:text-blue-400 hover:underline text-xs">Edit</button>
+                  <button onClick={() => handleDelete(s.id)} className="text-red-500 dark:text-red-400 hover:underline text-xs">Delete</button>
+                </td>
+              </tr>
+              {/* Expanded SOP file list */}
+              {sopExpanded === s.id && (
+                <tr key={`${s.id}-sop`} className="bg-gray-50 dark:bg-gray-750">
+                  <td colSpan={4} className="px-6 py-3">
+                    {(sopFiles[s.id] ?? []).length === 0 ? (
+                      <p className="text-xs text-gray-400 dark:text-gray-500">No files yet.</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {(sopFiles[s.id] ?? []).map((f) => (
+                          <div key={f.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <div>
+                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{f.original_filename}</span>
+                              <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">({formatFileSize(f.file_size)})</span>
+                            </div>
+                            <button
+                              onClick={() => handleSopDelete(s.id, f.id)}
+                              disabled={sopDeleting[f.id]}
+                              className="text-xs text-red-500 dark:text-red-400 hover:underline disabled:opacity-50"
+                            >
+                              {sopDeleting[f.id] ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )}
+            </>
           ))}
         </tbody>
       </table>

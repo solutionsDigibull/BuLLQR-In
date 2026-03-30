@@ -1,10 +1,11 @@
 """Configuration management endpoints."""
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Response
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import Optional, List
 from datetime import datetime, date
 from src.database import get_db
-from src.models import Product, ProductionStage, ProductStage, ReworkCost, Operator, ScanRecord
+from src.models import Product, ProductionStage, ProductStage, ReworkCost, Operator, ScanRecord, StageSopFile
 from src.models.rework_config import ReworkConfig
 from src.models.production_target import ProductionTarget
 from src.auth.password import hash_password
@@ -30,8 +31,14 @@ class StageUpdateBody(BaseModel):
 
 @router.get("/stages")
 async def list_stages(db: Session = Depends(get_db)):
-    """List all production stages."""
+    """List all production stages with SOP file counts."""
     stages = db.query(ProductionStage).order_by(ProductionStage.stage_sequence).all()
+    # Build sop_count map in a single query
+    sop_counts = dict(
+        db.query(StageSopFile.stage_id, func.count(StageSopFile.id))
+        .group_by(StageSopFile.stage_id)
+        .all()
+    )
     return {
         "stages": [
             {
@@ -39,6 +46,7 @@ async def list_stages(db: Session = Depends(get_db)):
                 "stage_name": s.stage_name,
                 "stage_sequence": s.stage_sequence,
                 "description": s.description,
+                "sop_count": sop_counts.get(s.id, 0),
             }
             for s in stages
         ]
@@ -182,6 +190,137 @@ async def delete_stage(
     db.execute(text("DELETE FROM production_stages WHERE id = :sid"), {"sid": str(stage_uuid)})
     db.commit()
     return {"message": "Stage deleted", "id": stage_id}
+
+
+# ========== Stage SOP Files ==========
+
+@router.post("/stages/{stage_id}/sop", status_code=status.HTTP_201_CREATED)
+async def upload_sop_file(
+    stage_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role("admin")),
+):
+    """Upload an SOP file (image, video, text, PDF) for a stage."""
+    try:
+        stage_uuid = uuid.UUID(stage_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid stage ID format")
+
+    stage = db.query(ProductionStage).filter(ProductionStage.id == stage_uuid).first()
+    if not stage:
+        raise HTTPException(status_code=404, detail="Stage not found")
+
+    content = await file.read()
+    mime_type = file.content_type or "application/octet-stream"
+
+    sop = StageSopFile(
+        id=uuid.uuid4(),
+        stage_id=stage_uuid,
+        original_filename=file.filename or "file",
+        mime_type=mime_type,
+        file_size=len(content),
+        content=content,
+        created_at=datetime.utcnow(),
+    )
+    db.add(sop)
+    db.commit()
+    db.refresh(sop)
+    return {
+        "id": str(sop.id),
+        "stage_id": str(sop.stage_id),
+        "original_filename": sop.original_filename,
+        "mime_type": sop.mime_type,
+        "file_size": sop.file_size,
+        "created_at": sop.created_at.isoformat(),
+    }
+
+
+@router.get("/stages/{stage_id}/sop")
+async def list_sop_files(
+    stage_id: str,
+    db: Session = Depends(get_db),
+):
+    """List SOP file metadata for a stage (no binary content)."""
+    try:
+        stage_uuid = uuid.UUID(stage_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid stage ID format")
+
+    files = (
+        db.query(StageSopFile)
+        .filter(StageSopFile.stage_id == stage_uuid)
+        .order_by(StageSopFile.created_at)
+        .all()
+    )
+    return {
+        "files": [
+            {
+                "id": str(f.id),
+                "stage_id": str(f.stage_id),
+                "original_filename": f.original_filename,
+                "mime_type": f.mime_type,
+                "file_size": f.file_size,
+                "created_at": f.created_at.isoformat(),
+            }
+            for f in files
+        ]
+    }
+
+
+@router.get("/stages/{stage_id}/sop/{file_id}/content")
+async def get_sop_file_content(
+    stage_id: str,
+    file_id: str,
+    db: Session = Depends(get_db),
+):
+    """Stream SOP file binary content for inline display."""
+    try:
+        stage_uuid = uuid.UUID(stage_id)
+        file_uuid = uuid.UUID(file_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    sop = (
+        db.query(StageSopFile)
+        .filter(StageSopFile.id == file_uuid, StageSopFile.stage_id == stage_uuid)
+        .first()
+    )
+    if not sop:
+        raise HTTPException(status_code=404, detail="SOP file not found")
+
+    return Response(
+        content=sop.content,
+        media_type=sop.mime_type,
+        headers={"Content-Disposition": f'inline; filename="{sop.original_filename}"'},
+    )
+
+
+@router.delete("/stages/{stage_id}/sop/{file_id}")
+async def delete_sop_file(
+    stage_id: str,
+    file_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role("admin")),
+):
+    """Delete an SOP file."""
+    try:
+        stage_uuid = uuid.UUID(stage_id)
+        file_uuid = uuid.UUID(file_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    sop = (
+        db.query(StageSopFile)
+        .filter(StageSopFile.id == file_uuid, StageSopFile.stage_id == stage_uuid)
+        .first()
+    )
+    if not sop:
+        raise HTTPException(status_code=404, detail="SOP file not found")
+
+    db.delete(sop)
+    db.commit()
+    return {"message": "SOP file deleted", "id": file_id}
 
 
 # ========== Products ==========

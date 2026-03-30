@@ -107,6 +107,16 @@ export interface ReworkConfigUpdate {
   is_active?: boolean;
 }
 
+// SOP Files
+export interface SopFile {
+  id: string;
+  stage_id: string;
+  original_filename: string;
+  mime_type: string;
+  file_size: number;
+  created_at: string;
+}
+
 // Production Target
 export interface ProductionTargetItem {
   id: string;
