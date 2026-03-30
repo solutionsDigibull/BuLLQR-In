@@ -52,7 +52,7 @@ export async function completeProductionTarget(productId: string): Promise<{ mes
 // Product Stages
 export async function setProductStages(
   productId: string,
-  stages: { stage_id: string; sequence: number }[],
+  stages: { stage_id: string; sequence: number; is_mandatory?: boolean }[],
 ): Promise<Product> {
   const response = await api.put<Product>(`/config/products/${productId}/stages`, { stages });
   return response.data;

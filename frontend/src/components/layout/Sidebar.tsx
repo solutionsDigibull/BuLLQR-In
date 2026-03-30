@@ -129,8 +129,8 @@ export default function Sidebar() {
           )}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-hover text-xs text-gray-500 dark:text-gray-400">
-          BuLLMQR v1.0.0
+        <div className="p-4 border-t border-sidebar-hover flex items-center gap-2">
+          <img src="/bullmqr-logo.png" alt="BuLLMQR" className="h-8" />
         </div>
       </aside>
 

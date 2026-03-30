@@ -17,7 +17,7 @@ const ALL_TABS: TabDef[] = [
   { id: 'products', label: 'Products', roles: ['admin'] },
   { id: 'stages', label: 'Stages', roles: ['admin'] },
   { id: 'operators', label: 'Operators', roles: ['admin'] },
-  { id: 'rework-config', label: 'Rework Config', roles: ['supervisor', 'admin'] },
+  { id: 'rework-config', label: 'Defect', roles: ['supervisor', 'admin'] },
   { id: 'target', label: 'Production Target', roles: ['supervisor', 'admin'] },
   { id: 'export', label: 'Export', roles: ['supervisor', 'admin'] },
 ];

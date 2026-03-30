@@ -47,6 +47,30 @@ export async function getTodayCount(stageId?: string): Promise<{
   return response.data;
 }
 
+export async function getStageDefectCounts(productId?: string): Promise<{
+  counts: { stage_id: string; defect_count: number }[];
+  date: string;
+}> {
+  const params: Record<string, unknown> = {};
+  if (productId) params.product_id = productId;
+  const response = await api.get<{
+    counts: { stage_id: string; defect_count: number }[];
+    date: string;
+  }>('/session/stage-defect-counts', { params });
+  return response.data;
+}
+
+export async function getProductsTodayCounts(): Promise<{
+  counts: { product_id: string; count: number }[];
+  date: string;
+}> {
+  const response = await api.get<{
+    counts: { product_id: string; count: number }[];
+    date: string;
+  }>('/session/products-today-counts');
+  return response.data;
+}
+
 export async function getStages(): Promise<ProductionStage[]> {
   const response = await api.get<{ stages: ProductionStage[] }>('/config/stages');
   return response.data.stages;

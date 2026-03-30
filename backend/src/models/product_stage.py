@@ -1,6 +1,6 @@
 """Association table linking products to their production stages."""
 import uuid
-from sqlalchemy import Column, ForeignKey, Integer, UniqueConstraint
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, UniqueConstraint
 from src.database import Base
 from src.models.types import GUID
 
@@ -20,6 +20,7 @@ class ProductStage(Base):
     product_id = Column(GUID, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     stage_id = Column(GUID, ForeignKey("production_stages.id", ondelete="CASCADE"), nullable=False)
     sequence = Column(Integer, nullable=False, default=1)
+    is_mandatory = Column(Boolean, nullable=False, default=False)
 
     __table_args__ = (
         UniqueConstraint("product_id", "stage_id", name="uq_product_stage"),

@@ -90,6 +90,57 @@ async def get_today_count(
     return {"unique_work_orders": count, "date": today.isoformat()}
 
 
+@router.get("/stage-defect-counts")
+async def get_stage_defect_counts(
+    product_id: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Get today's not_ok scan count per stage, optionally filtered by product."""
+    today = datetime.utcnow().date()
+    today_start = datetime(today.year, today.month, today.day)
+
+    q = (
+        db.query(ScanRecord.stage_id, func.count(ScanRecord.id))
+        .join(WorkOrder, ScanRecord.work_order_id == WorkOrder.id)
+        .filter(ScanRecord.scan_timestamp >= today_start)
+        .filter(ScanRecord.quality_status == "not_ok")
+    )
+    if product_id:
+        q = q.filter(WorkOrder.product_id == product_id)
+
+    rows = q.group_by(ScanRecord.stage_id).all()
+    return {
+        "counts": [
+            {"stage_id": str(stage_id), "defect_count": count}
+            for stage_id, count in rows
+        ],
+        "date": today.isoformat(),
+    }
+
+
+@router.get("/products-today-counts")
+async def get_products_today_counts(db: Session = Depends(get_db)):
+    """Get unique work order count per product for today."""
+    today = datetime.utcnow().date()
+    today_start = datetime(today.year, today.month, today.day)
+
+    rows = (
+        db.query(WorkOrder.product_id, func.count(func.distinct(ScanRecord.work_order_id)))
+        .join(ScanRecord, ScanRecord.work_order_id == WorkOrder.id)
+        .filter(ScanRecord.scan_timestamp >= today_start)
+        .filter(WorkOrder.product_id.isnot(None))
+        .group_by(WorkOrder.product_id)
+        .all()
+    )
+    return {
+        "counts": [
+            {"product_id": str(product_id), "count": count}
+            for product_id, count in rows
+        ],
+        "date": today.isoformat(),
+    }
+
+
 class SessionDataBody(BaseModel):
     stage_id: uuid_mod.UUID
     operator_id: Optional[uuid_mod.UUID] = None

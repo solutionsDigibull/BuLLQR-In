@@ -192,6 +192,7 @@ class ProductCreateBody(BaseModel):
     production_target: Optional[int] = None
 
 class ProductUpdateBody(BaseModel):
+    product_code: Optional[str] = None
     product_name: Optional[str] = None
     is_active: Optional[bool] = None
     production_target: Optional[int] = None
@@ -262,6 +263,14 @@ async def update_product(
     p = db.query(Product).filter(Product.id == product_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Product not found")
+    if body.product_code is not None:
+        dup = db.query(Product).filter(
+            Product.product_code == body.product_code,
+            Product.id != p.id,
+        ).first()
+        if dup:
+            raise HTTPException(status_code=409, detail="Product code already exists")
+        p.product_code = body.product_code
     if body.product_name is not None:
         p.product_name = body.product_name
     if body.production_target is not None:
@@ -337,6 +346,7 @@ async def complete_production_target(
 class StageWithSequence(BaseModel):
     stage_id: str
     sequence: int = Field(..., ge=1)
+    is_mandatory: bool = False
 
 class ProductStagesBody(BaseModel):
     stages: List[StageWithSequence]
@@ -352,7 +362,7 @@ async def get_product_stages(
     if not p:
         raise HTTPException(status_code=404, detail="Product not found")
     rows = (
-        db.query(ProductionStage, ProductStage.sequence)
+        db.query(ProductionStage, ProductStage.sequence, ProductStage.is_mandatory)
         .join(ProductStage, ProductStage.stage_id == ProductionStage.id)
         .filter(ProductStage.product_id == product_id)
         .order_by(ProductStage.sequence)
@@ -365,8 +375,9 @@ async def get_product_stages(
                 "stage_name": s.stage_name,
                 "stage_sequence": seq,
                 "description": s.description,
+                "is_mandatory": is_mandatory,
             }
-            for s, seq in rows
+            for s, seq, is_mandatory in rows
         ]
     }
 
@@ -403,6 +414,7 @@ async def set_product_stages(
             product_id=p.id,
             stage_id=entry.stage_id,
             sequence=entry.sequence,
+            is_mandatory=entry.is_mandatory,
         ))
     db.commit()
 

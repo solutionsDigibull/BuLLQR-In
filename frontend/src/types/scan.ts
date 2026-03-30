@@ -57,6 +57,7 @@ export interface ProductionStage {
   stage_name: string;
   stage_sequence: number;
   description: string | null;
+  is_mandatory: boolean;
 }
 
 export interface ApiErrorResponse {

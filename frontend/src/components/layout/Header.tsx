@@ -38,7 +38,7 @@ export default function Header({ onToggleSidebar, sidebarVisible }: HeaderProps)
             )}
           </button>
         )}
-        <img src="/bullmqr-logo.png" alt="BuLLMQR" className="h-16" />
+        <img src="/Innotech-Integration.png" alt="Innotech" className="h-16" />
       </div>
 
       <div className="flex items-center gap-4">

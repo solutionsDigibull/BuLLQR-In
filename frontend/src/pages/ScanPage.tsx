@@ -7,7 +7,8 @@ import FirstArticleDialog from '../components/scan/FirstArticleDialog.tsx';
 import ScanFeedback from '../components/scan/ScanFeedback.tsx';
 import SessionDisplay from '../components/scan/SessionDisplay.tsx';
 import * as scanService from '../services/scan.ts';
-import { listProducts, getProductStages } from '../services/config.ts';
+import { listProducts, getProductStages, setProductStages } from '../services/config.ts';
+import { formatIST } from '../utils/timezone.ts';
 import type {
   ProductionStage,
   QualityStatus,
@@ -34,11 +35,15 @@ export default function ScanPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [selectedProductId, setSelectedProductId] = useState('');
+  // Per-product today's scan count: { productId -> count }
+  const [productTodayCounts, setProductTodayCounts] = useState<Record<string, number>>({});
 
   // Setup state
   const [stages, setStages] = useState<ProductionStage[]>([]);
   const [stagesLoading, setStagesLoading] = useState(true);
   const [selectedStageId, setSelectedStageId] = useState('');
+  // Per-stage defect (not_ok) count for today: { stageId -> count }
+  const [stageDefectCounts, setStageDefectCounts] = useState<Record<string, number>>({});
 
   // Operator state
   const [operators, setOperators] = useState<User[]>([]);
@@ -89,7 +94,7 @@ export default function ScanPage() {
   const highlightTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const selectedStageIdRef = useRef(selectedStageId);
 
-  // Load products on mount
+  // Load products and today's per-product counts on mount
   useEffect(() => {
     let cancelled = false;
     listProducts()
@@ -100,15 +105,25 @@ export default function ScanPage() {
       .finally(() => {
         if (!cancelled) setProductsLoading(false);
       });
+    scanService.getProductsTodayCounts()
+      .then((data) => {
+        if (!cancelled) {
+          const map: Record<string, number> = {};
+          data.counts.forEach((c) => { map[c.product_id] = c.count; });
+          setProductTodayCounts(map);
+        }
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  // Load stages when product changes
+  // Load stages and defect counts when product changes
   useEffect(() => {
     if (!selectedProductId) {
       setStages([]);
       setSelectedStageId('');
       setStagesLoading(false);
+      setStageDefectCounts({});
       return;
     }
     let cancelled = false;
@@ -124,6 +139,15 @@ export default function ScanPage() {
       .finally(() => {
         if (!cancelled) setStagesLoading(false);
       });
+    scanService.getStageDefectCounts(selectedProductId)
+      .then((data) => {
+        if (!cancelled) {
+          const map: Record<string, number> = {};
+          data.counts.forEach((c) => { map[c.stage_id] = c.defect_count; });
+          setStageDefectCounts(map);
+        }
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [selectedProductId]);
 
@@ -261,6 +285,26 @@ export default function ScanPage() {
     });
   }, [subscribe]);
 
+  async function handleMandatoryChange(stageId: string, isMandatory: boolean) {
+    const updated = stages.map((s) =>
+      s.id === stageId ? { ...s, is_mandatory: isMandatory } : s,
+    );
+    setStages(updated);
+    try {
+      await setProductStages(
+        selectedProductId,
+        updated.map((s) => ({
+          stage_id: s.id,
+          sequence: s.stage_sequence,
+          is_mandatory: s.is_mandatory,
+        })),
+      );
+    } catch {
+      // revert on failure
+      setStages(stages);
+    }
+  }
+
   function resetScanFlow() {
     setFlowState('idle');
     setScannedBarcode('');
@@ -332,13 +376,28 @@ export default function ScanPage() {
       });
       resetScanFlow();
 
-      // Refresh first article status after successful scan
+      // Refresh first article status and per-product counts after successful scan
       scanService
         .getFirstArticleStatus()
         .then((data) => {
           const map = new Map<string, boolean>();
           data.stages.forEach((s) => map.set(s.stage_id, s.first_article_completed));
           setFirstArticleStages(map);
+        })
+        .catch(() => {});
+      scanService
+        .getProductsTodayCounts()
+        .then((data) => {
+          const map: Record<string, number> = {};
+          data.counts.forEach((c) => { map[c.product_id] = c.count; });
+          setProductTodayCounts(map);
+        })
+        .catch(() => {});
+      scanService.getStageDefectCounts(selectedProductId)
+        .then((data) => {
+          const map: Record<string, number> = {};
+          data.counts.forEach((c) => { map[c.stage_id] = c.defect_count; });
+          setStageDefectCounts(map);
         })
         .catch(() => {});
     } catch (err) {
@@ -411,44 +470,104 @@ export default function ScanPage() {
       />
 
       {/* Setup & Input Panel */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5 space-y-4">
-        {/* Row 1: Product, Stage, Operator */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Product selector */}
-          <div>
-            <label htmlFor="product-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Product
-            </label>
-            <select
-              id="product-select"
-              value={selectedProductId}
-              onChange={(e) => {
-                setSelectedProductId(e.target.value);
-                if (flowState !== 'idle') resetScanFlow();
-              }}
-              disabled={isSubmitting || productsLoading}
-              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100 dark:disabled:bg-gray-600"
-            >
-              <option value="">{productsLoading ? 'Loading...' : 'Select a product'}</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.product_code} — {p.product_name}
-                </option>
-              ))}
-            </select>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5 space-y-5">
+
+        {/* Top row: Stage (left) + Product Selection (right) */}
+        <div className="flex gap-6 items-start">
+
+          {/* LEFT: Production Stage */}
+          <div className="flex-1 min-w-0">
+            {selectedProductId ? (
+              <StageSelector
+                stages={stages}
+                selectedStageId={selectedStageId}
+                onChange={(id) => {
+                  setSelectedStageId(id);
+                  if (flowState !== 'idle') resetScanFlow();
+                }}
+                onMandatoryChange={handleMandatoryChange}
+                stageDefectCounts={stageDefectCounts}
+                loading={stagesLoading}
+                disabled={isSubmitting}
+              />
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Production Stage
+                </label>
+                <p className="text-sm text-gray-400 dark:text-gray-500">
+                  Select a product to view stages.
+                </p>
+              </div>
+            )}
           </div>
 
-          <StageSelector
-            stages={stages}
-            selectedStageId={selectedStageId}
-            onChange={(id) => {
-              setSelectedStageId(id);
-              if (flowState !== 'idle') resetScanFlow();
-            }}
-            loading={stagesLoading}
-            disabled={isSubmitting}
-          />
+          {/* RIGHT: Product Selection & Targets */}
+          <div className="w-72 shrink-0">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Product Selection &amp; Targets
+            </label>
+            {productsLoading ? (
+              <p className="text-sm text-gray-400 dark:text-gray-500">Loading products...</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {products.map((p) => {
+                  const isSelected = selectedProductId === p.id;
+                  const scanned = productTodayCounts[p.id] ?? 0;
+                  const target = p.production_target;
+                  const pct = target && target > 0 ? Math.min(100, Math.round((scanned / target) * 100)) : 0;
 
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProductId(p.id);
+                        if (flowState !== 'idle') resetScanFlow();
+                      }}
+                      disabled={isSubmitting}
+                      className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isSelected
+                          ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                          : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-primary/50'
+                      }`}
+                    >
+                      {/* Top row: name + count/target */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <span className={`block text-sm font-bold ${isSelected ? 'text-primary' : 'text-gray-800 dark:text-gray-100'}`}>
+                            {p.product_name}
+                          </span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">{p.product_code}</span>
+                        </div>
+                        {target != null ? (
+                          <span className={`text-sm font-semibold tabular-nums ${isSelected ? 'text-primary' : 'text-gray-600 dark:text-gray-300'}`}>
+                            {scanned}/{target}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400 dark:text-gray-500 italic">No target</span>
+                        )}
+                      </div>
+
+                      {/* Progress bar */}
+                      {target != null && (
+                        <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-green-500' : isSelected ? 'bg-primary' : 'bg-blue-400'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Operator, Supervisor, Quality Inspector */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-gray-100 dark:border-gray-700 pt-4">
           {/* Operator selector */}
           <div>
             <label htmlFor="operator-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -469,10 +588,7 @@ export default function ScanPage() {
               ))}
             </select>
           </div>
-        </div>
 
-        {/* Row 2: Supervisor, Quality Inspector, Quality Status */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Supervisor selector */}
           <div>
             <label htmlFor="supervisor-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -514,25 +630,6 @@ export default function ScanPage() {
               ))}
             </select>
           </div>
-
-          {/* Quality Status selector */}
-          <div>
-            <label htmlFor="quality-status-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Quality Status
-            </label>
-            <select
-              id="quality-status-select"
-              value={selectedQualityStatus}
-              onChange={(e) => setSelectedQualityStatus(e.target.value as QualityStatus)}
-              disabled={isSubmitting}
-              className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100 dark:disabled:bg-gray-600"
-            >
-              <option value="ok">OK</option>
-              <option value="not_ok">Not OK</option>
-              <option value="ok_update">OK Update</option>
-              <option value="not_ok_update">Not OK Update</option>
-            </select>
-          </div>
         </div>
 
         {/* First article notice */}
@@ -546,33 +643,142 @@ export default function ScanPage() {
         )}
       </div>
 
-      {/* Scan Input Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5 space-y-3">
-        <BarcodeInput
-          value={barcodeValue}
-          onChange={setBarcodeValue}
-          onScan={handleBarcodeScanned}
-          disabled={!isSetupReady || isSubmitting || flowState !== 'idle'}
-          error={barcodeError}
-        />
+      {/* Scan Input + Quality Control */}
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Left: Scan Input */}
+        <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5 space-y-3">
+          <div className="flex flex-col items-center gap-2 mb-2">
+            <svg className="w-12 h-12 text-primary opacity-70" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zm0 9.75c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zm9.75-9.75c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zm0 9.75h.75v.75h-.75v-.75zm9.75-9.75h.75v.75h-.75v-.75zm-9 3.75h3v3h-3v-3zm9 0h3v3h-3v-3zm-9 6h3v3h-3v-3zm6-6h.75v.75H15v-.75zm0 3h.75v.75H15v-.75zm0 3h.75v.75H15v-.75zm3-6h.75v.75h-.75v-.75zm0 3h.75v.75h-.75v-.75zm0 3h.75v.75h-.75v-.75z" />
+            </svg>
+            <span className="text-sm font-semibold tracking-widest uppercase text-primary">Scan Here</span>
+          </div>
 
-        {scannedBarcode && flowState !== 'idle' && (
-          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-md">
-            <span className="font-mono font-medium text-gray-700 dark:text-gray-200">{scannedBarcode}</span>
+          <BarcodeInput
+            value={barcodeValue}
+            onChange={setBarcodeValue}
+            onScan={handleBarcodeScanned}
+            disabled={!isSetupReady || isSubmitting || flowState !== 'idle'}
+            error={barcodeError}
+          />
+
+          {scannedBarcode && flowState !== 'idle' && (
+            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-md">
+              <span className="font-mono font-medium text-gray-700 dark:text-gray-200">{scannedBarcode}</span>
+              <button
+                type="button"
+                onClick={resetScanFlow}
+                disabled={isSubmitting}
+                className="ml-auto text-xs text-gray-400 hover:text-danger transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {isSubmitting && (
+            <p className="text-center text-sm text-gray-500 py-2">Processing scan...</p>
+          )}
+        </div>
+
+        {/* Right: Quality Control */}
+        <div className="lg:w-72 bg-gray-900 dark:bg-gray-950 rounded-lg border border-gray-700 p-4 flex flex-col gap-3">
+          {/* Header */}
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-primary shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 8a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zm6-6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zm0 8a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+            <span className="text-sm font-semibold text-white tracking-wide">Quality Control</span>
+          </div>
+
+          {/* 2×2 button grid */}
+          <div className="grid grid-cols-2 gap-2">
+            {/* OKAY */}
             <button
               type="button"
-              onClick={resetScanFlow}
+              onClick={() => setSelectedQualityStatus('ok')}
               disabled={isSubmitting}
-              className="ml-auto text-xs text-gray-400 hover:text-danger transition-colors cursor-pointer"
+              className={`flex flex-col items-center justify-center gap-1.5 py-3 rounded-md border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                selectedQualityStatus === 'ok'
+                  ? 'bg-green-700 border-green-400 ring-2 ring-green-400'
+                  : 'bg-gray-800 border-gray-600 hover:bg-gray-700'
+              }`}
             >
-              Cancel
+              <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              <span className="text-xs font-semibold text-white tracking-wider">OKAY</span>
+            </button>
+
+            {/* NOT OKAY */}
+            <button
+              type="button"
+              onClick={() => setSelectedQualityStatus('not_ok')}
+              disabled={isSubmitting}
+              className={`flex flex-col items-center justify-center gap-1.5 py-3 rounded-md border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                selectedQualityStatus === 'not_ok'
+                  ? 'bg-red-700 border-red-400 ring-2 ring-red-400'
+                  : 'bg-gray-800 border-gray-600 hover:bg-gray-700'
+              }`}
+            >
+              <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span className="text-xs font-semibold text-white tracking-wider">NOT OKAY</span>
+            </button>
+
+            {/* OKAY UPDATE */}
+            <button
+              type="button"
+              onClick={() => setSelectedQualityStatus('ok_update')}
+              disabled={isSubmitting}
+              className={`flex flex-col items-center justify-center gap-1.5 py-3 rounded-md border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                selectedQualityStatus === 'ok_update'
+                  ? 'bg-blue-700 border-blue-400 ring-2 ring-blue-400'
+                  : 'bg-gray-800 border-gray-600 hover:bg-gray-700'
+              }`}
+            >
+              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              <span className="text-xs font-semibold text-white tracking-wider">OKAY UPD</span>
+            </button>
+
+            {/* NOT OKAY UPDATE */}
+            <button
+              type="button"
+              onClick={() => setSelectedQualityStatus('not_ok_update')}
+              disabled={isSubmitting}
+              className={`flex flex-col items-center justify-center gap-1.5 py-3 rounded-md border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                selectedQualityStatus === 'not_ok_update'
+                  ? 'bg-orange-700 border-orange-400 ring-2 ring-orange-400'
+                  : 'bg-gray-800 border-gray-600 hover:bg-gray-700'
+              }`}
+            >
+              <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              <span className="text-xs font-semibold text-white tracking-wider">NOT OK UPD</span>
             </button>
           </div>
-        )}
 
-        {isSubmitting && (
-          <p className="text-center text-sm text-gray-500 py-2">Processing scan...</p>
-        )}
+          {/* Footer info */}
+          <div className="mt-auto border-t border-gray-700 pt-3 space-y-1.5 text-xs">
+            <div className="flex justify-between">
+              <span className="text-gray-400 font-medium tracking-wider uppercase">Approved By</span>
+              <span className="text-white font-mono text-right truncate max-w-[120px]">
+                {supervisors.find((s) => s.id === selectedSupervisorId)?.full_name ?? '—'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 font-medium tracking-wider uppercase">Timestamp</span>
+              <span className="text-white font-mono text-right">
+                {recentScans[0]?.scan_timestamp ? formatIST(recentScans[0].scan_timestamp) : '—'}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {showFirstArticle && (
