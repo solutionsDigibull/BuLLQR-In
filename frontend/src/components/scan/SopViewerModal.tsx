@@ -5,6 +5,7 @@ import type { SopFile } from '../../types/config.ts';
 interface SopViewerModalProps {
   stageId: string;
   stageName: string;
+  initialFileId?: string;
   onClose: () => void;
 }
 
@@ -14,7 +15,7 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function SopViewerModal({ stageId, stageName, onClose }: SopViewerModalProps) {
+export default function SopViewerModal({ stageId, stageName, initialFileId, onClose }: SopViewerModalProps) {
   const [files, setFiles] = useState<SopFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -22,10 +23,16 @@ export default function SopViewerModal({ stageId, stageName, onClose }: SopViewe
 
   useEffect(() => {
     listSopFiles(stageId)
-      .then(setFiles)
+      .then((data) => {
+        setFiles(data);
+        if (initialFileId) {
+          const match = data.find((f) => f.id === initialFileId);
+          if (match) setActiveFile(match);
+        }
+      })
       .catch(() => setError('Failed to load SOP files'))
       .finally(() => setLoading(false));
-  }, [stageId]);
+  }, [stageId, initialFileId]);
 
   function renderFilePreview(file: SopFile) {
     const url = getSopFileUrl(stageId, file.id);

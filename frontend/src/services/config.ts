@@ -1,4 +1,5 @@
 import api from './api.ts';
+import { getToken } from '../utils/token.ts';
 import type {
   Product,
   ProductCreate,
@@ -118,12 +119,22 @@ export async function deleteStage(stageId: string, force = false): Promise<void>
 
 // SOP Files
 export async function uploadSopFile(stageId: string, file: File): Promise<SopFile> {
+  if (file.size > 10 * 1024 * 1024) {
+    throw new Error('File size exceeds 10 MB limit');
+  }
   const formData = new FormData();
   formData.append('file', file);
-  const response = await api.post<SopFile>(`/config/stages/${stageId}/sop`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+  const token = getToken();
+  const res = await fetch(`/api/v1/config/stages/${stageId}/sop`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
   });
-  return response.data;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Upload failed (${res.status})`);
+  }
+  return res.json();
 }
 
 export async function listSopFiles(stageId: string): Promise<SopFile[]> {

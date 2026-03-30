@@ -212,6 +212,8 @@ async def upload_sop_file(
         raise HTTPException(status_code=404, detail="Stage not found")
 
     content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File size exceeds 10 MB limit")
     mime_type = file.content_type or "application/octet-stream"
 
     sop = StageSopFile(
@@ -507,6 +509,11 @@ async def get_product_stages(
         .order_by(ProductStage.sequence)
         .all()
     )
+    sop_counts = dict(
+        db.query(StageSopFile.stage_id, func.count(StageSopFile.id))
+        .group_by(StageSopFile.stage_id)
+        .all()
+    )
     return {
         "stages": [
             {
@@ -515,6 +522,7 @@ async def get_product_stages(
                 "stage_sequence": seq,
                 "description": s.description,
                 "is_mandatory": is_mandatory,
+                "sop_count": sop_counts.get(s.id, 0),
             }
             for s, seq, is_mandatory in rows
         ]

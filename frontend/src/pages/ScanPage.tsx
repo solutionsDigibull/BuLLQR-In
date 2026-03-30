@@ -88,7 +88,7 @@ export default function ScanPage() {
   }>({ type: null, message: '' });
 
   // SOP viewer state
-  const [sopViewStageId, setSopViewStageId] = useState<string | null>(null);
+  const [sopViewState, setSopViewState] = useState<{ stageId: string; fileId?: string } | null>(null);
 
   // Session state
   const [recentScans, setRecentScans] = useState<ScanRecord[]>([]);
@@ -490,7 +490,7 @@ export default function ScanPage() {
                   if (flowState !== 'idle') resetScanFlow();
                 }}
                 onMandatoryChange={handleMandatoryChange}
-                onViewSop={(id) => setSopViewStageId(id)}
+                onViewSop={(stageId, fileId) => setSopViewState({ stageId, fileId })}
                 stageDefectCounts={stageDefectCounts}
                 loading={stagesLoading}
                 disabled={isSubmitting}
@@ -800,11 +800,12 @@ export default function ScanPage() {
       <SessionDisplay scans={recentScans} highlightIds={highlightIds} totalCount={stageTotalCount} />
 
       {/* SOP Viewer Modal */}
-      {sopViewStageId && (
+      {sopViewState && (
         <SopViewerModal
-          stageId={sopViewStageId}
-          stageName={stages.find((s) => s.id === sopViewStageId)?.stage_name ?? ''}
-          onClose={() => setSopViewStageId(null)}
+          stageId={sopViewState.stageId}
+          stageName={stages.find((s) => s.id === sopViewState.stageId)?.stage_name ?? ''}
+          initialFileId={sopViewState.fileId}
+          onClose={() => setSopViewState(null)}
         />
       )}
     </div>
