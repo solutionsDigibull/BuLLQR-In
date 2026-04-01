@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 from src.database import get_db
-from src.models import ScanRecord, WorkOrder, ProductionStage, Operator
+from src.models import ScanRecord, WorkOrder, ProductionStage, Operator, ProductStage
 import uuid as uuid_mod
 
 router = APIRouter(prefix="/api/v1/session", tags=["session"])
@@ -17,9 +17,10 @@ async def get_latest_scans(
     limit: int = Query(10, ge=1, le=100),
     stage_id: Optional[str] = Query(None),
     operator_id: Optional[str] = Query(None),
+    product_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """Get latest scan records for session display, with optional stage/operator filters."""
+    """Get latest scan records for session display, with optional stage/operator/product filters."""
     q = (
         db.query(ScanRecord)
         .join(WorkOrder, ScanRecord.work_order_id == WorkOrder.id)
@@ -30,6 +31,8 @@ async def get_latest_scans(
         q = q.filter(ScanRecord.stage_id == stage_id)
     if operator_id:
         q = q.filter(ScanRecord.operator_id == operator_id)
+    if product_id:
+        q = q.filter(WorkOrder.product_id == product_id)
 
     scans = q.order_by(ScanRecord.scan_timestamp.desc()).limit(limit).all()
 
@@ -61,9 +64,11 @@ async def get_latest_scans(
             "created_at": s.created_at.isoformat() if s.created_at else None,
         })
 
-    count_q = db.query(func.count(ScanRecord.id))
+    count_q = db.query(func.count(ScanRecord.id)).join(WorkOrder, ScanRecord.work_order_id == WorkOrder.id)
     if stage_id:
         count_q = count_q.filter(ScanRecord.stage_id == stage_id)
+    if product_id:
+        count_q = count_q.filter(WorkOrder.product_id == product_id)
     total_count = count_q.scalar() or 0
     return {"scans": result, "total_count": total_count}
 
@@ -72,19 +77,24 @@ async def get_latest_scans(
 async def get_today_count(
     stage_id: Optional[str] = Query(None),
     operator_id: Optional[str] = Query(None),
+    product_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """Get unique work order count for today, with optional stage/operator filters."""
+    """Get unique work order count for today, with optional stage/operator/product filters."""
     today = datetime.utcnow().date()
     today_start = datetime(today.year, today.month, today.day)
 
-    q = db.query(func.count(func.distinct(ScanRecord.work_order_id))).filter(
-        ScanRecord.scan_timestamp >= today_start
+    q = (
+        db.query(func.count(func.distinct(ScanRecord.work_order_id)))
+        .join(WorkOrder, ScanRecord.work_order_id == WorkOrder.id)
+        .filter(ScanRecord.scan_timestamp >= today_start)
     )
     if stage_id:
         q = q.filter(ScanRecord.stage_id == stage_id)
     if operator_id:
         q = q.filter(ScanRecord.operator_id == operator_id)
+    if product_id:
+        q = q.filter(WorkOrder.product_id == product_id)
 
     count = q.scalar() or 0
     return {"unique_work_orders": count, "date": today.isoformat()}
@@ -120,16 +130,39 @@ async def get_stage_defect_counts(
 
 @router.get("/products-today-counts")
 async def get_products_today_counts(db: Session = Depends(get_db)):
-    """Get unique work order count per product for today."""
+    """Get unique work order count per product for today, based only on the last stage scans."""
     today = datetime.utcnow().date()
     today_start = datetime(today.year, today.month, today.day)
 
+    # Subquery: find the max sequence per product
+    max_seq_subq = (
+        db.query(
+            ProductStage.product_id,
+            func.max(ProductStage.sequence).label("max_seq"),
+        )
+        .group_by(ProductStage.product_id)
+        .subquery()
+    )
+
+    # Subquery: get the stage_id that corresponds to the last stage for each product
+    last_stage_subq = (
+        db.query(ProductStage.product_id, ProductStage.stage_id)
+        .join(
+            max_seq_subq,
+            (ProductStage.product_id == max_seq_subq.c.product_id)
+            & (ProductStage.sequence == max_seq_subq.c.max_seq),
+        )
+        .subquery()
+    )
+
+    # Count distinct work orders scanned at the last stage today, per product
     rows = (
-        db.query(WorkOrder.product_id, func.count(func.distinct(ScanRecord.work_order_id)))
-        .join(ScanRecord, ScanRecord.work_order_id == WorkOrder.id)
+        db.query(last_stage_subq.c.product_id, func.count(func.distinct(ScanRecord.work_order_id)))
+        .join(ScanRecord, ScanRecord.stage_id == last_stage_subq.c.stage_id)
+        .join(WorkOrder, ScanRecord.work_order_id == WorkOrder.id)
         .filter(ScanRecord.scan_timestamp >= today_start)
-        .filter(WorkOrder.product_id.isnot(None))
-        .group_by(WorkOrder.product_id)
+        .filter(WorkOrder.product_id == last_stage_subq.c.product_id)
+        .group_by(last_stage_subq.c.product_id)
         .all()
     )
     return {

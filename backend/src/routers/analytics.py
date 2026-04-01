@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
-from datetime import date, datetime, timedelta
+from datetime import date as date_cls, datetime, timedelta
 from typing import Optional
 from src.database import get_db
 from src.models import (
@@ -19,7 +19,7 @@ def _get_active_product(db: Session):
     return db.query(Product).filter(Product.is_active == True).first()
 
 
-def _stage_progress(db: Session, product: Optional[Product], today_only: bool = False):
+def _stage_progress(db: Session, product: Optional[Product], date_filter: Optional[date_cls] = None):
     # Use product-specific stages in product-specific sequence order when available
     if product:
         rows = (
@@ -32,7 +32,6 @@ def _stage_progress(db: Session, product: Optional[Product], today_only: bool = 
         if rows:
             stages = [(stage, seq) for stage, seq in rows]
         else:
-            # Fallback: product has no stage assignments, use all global stages
             stages = [
                 (s, s.stage_sequence)
                 for s in db.query(ProductionStage).order_by(ProductionStage.stage_sequence).all()
@@ -43,19 +42,18 @@ def _stage_progress(db: Session, product: Optional[Product], today_only: bool = 
             for s in db.query(ProductionStage).order_by(ProductionStage.stage_sequence).all()
         ]
 
-    # Calculate today's start timestamp for filtering
-    today_start = None
-    if today_only:
-        today = datetime.utcnow().date()
-        today_start = datetime(today.year, today.month, today.day)
+    day_start = day_end = None
+    if date_filter:
+        day_start = datetime(date_filter.year, date_filter.month, date_filter.day)
+        day_end = day_start + timedelta(days=1)
 
     result = []
     for s, seq in stages:
         q = db.query(ScanRecord).filter(ScanRecord.stage_id == s.id)
         if product:
             q = q.join(WorkOrder).filter(WorkOrder.product_id == product.id)
-        if today_start:
-            q = q.filter(ScanRecord.scan_timestamp >= today_start)
+        if day_start:
+            q = q.filter(ScanRecord.scan_timestamp >= day_start, ScanRecord.scan_timestamp < day_end)
         total = q.count()
         ok = q.filter(ScanRecord.quality_status.in_(['ok', 'ok_update'])).count()
         not_ok = total - ok
@@ -76,7 +74,7 @@ def _stage_progress(db: Session, product: Optional[Product], today_only: bool = 
 async def get_production_progress(db: Session = Depends(get_db)):
     """Production progress for all stages (current day only)."""
     product = _get_active_product(db)
-    stages = _stage_progress(db, product, today_only=True)
+    stages = _stage_progress(db, product, date_filter=datetime.utcnow().date())
     target_status = product.target_status if product else "not_set"
     total = sum(s["current_count"] for s in stages)
     target = sum(s["target_count"] for s in stages)
@@ -90,28 +88,33 @@ async def get_production_progress(db: Session = Depends(get_db)):
 @router.get("/dashboard")
 async def get_dashboard(
     product_id: Optional[str] = Query(None),
+    date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """Combined dashboard data (current day scans)."""
+    """Combined dashboard data. Filters to a specific date (YYYY-MM-DD) or today if omitted."""
     if product_id:
         product = db.query(Product).filter(Product.id == product_id).first()
     else:
         product = _get_active_product(db)
-    stages = _stage_progress(db, product, today_only=True)
+
+    selected_date = date_cls.fromisoformat(date) if date else datetime.utcnow().date()
+    stages = _stage_progress(db, product, date_filter=selected_date)
     target_status = product.target_status if product else "not_set"
     total = sum(s["current_count"] for s in stages)
     target = sum(s["target_count"] for s in stages)
 
-    # Today's date boundary
-    today = datetime.utcnow().date()
-    today_start = datetime(today.year, today.month, today.day)
+    day_start = datetime(selected_date.year, selected_date.month, selected_date.day)
+    day_end = day_start + timedelta(days=1)
 
-    # Quality stats — today only
-    today_scans_q = db.query(ScanRecord).filter(ScanRecord.scan_timestamp >= today_start)
+    # Quality stats — selected date only
+    day_scans_q = db.query(ScanRecord).filter(
+        ScanRecord.scan_timestamp >= day_start,
+        ScanRecord.scan_timestamp < day_end,
+    )
     if product:
-        today_scans_q = today_scans_q.join(WorkOrder).filter(WorkOrder.product_id == product.id)
-    total_scans = today_scans_q.count()
-    ok_count = today_scans_q.filter(
+        day_scans_q = day_scans_q.join(WorkOrder).filter(WorkOrder.product_id == product.id)
+    total_scans = day_scans_q.count()
+    ok_count = day_scans_q.filter(
         ScanRecord.quality_status.in_(['ok', 'ok_update'])
     ).count()
     not_ok_count = total_scans - ok_count
@@ -127,9 +130,10 @@ async def get_dashboard(
         if cost:
             total_copq += float(cost.cost_per_rework)
 
-    # Today unique WO
+    # Unique WOs for selected date
     today_unique = db.query(func.count(func.distinct(ScanRecord.work_order_id))).filter(
-        ScanRecord.scan_timestamp >= today_start
+        ScanRecord.scan_timestamp >= day_start,
+        ScanRecord.scan_timestamp < day_end,
     ).scalar() or 0
 
     return {
@@ -337,6 +341,73 @@ async def get_copq(
     }
 
 
+@router.get("/product-performance")
+async def get_product_performance(
+    days: int = Query(7, ge=1, le=365),
+    date: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Yield rate, defect rate and trend per product. When date given, shows that single day."""
+    if date:
+        selected_date = date_cls.fromisoformat(date)
+        current_start = datetime(selected_date.year, selected_date.month, selected_date.day)
+        current_end = current_start + timedelta(days=1)
+        prev_start = current_start - timedelta(days=1)
+        prev_end = current_start
+    else:
+        now = datetime.utcnow()
+        current_start = now - timedelta(days=days)
+        current_end = None
+        prev_start = now - timedelta(days=days * 2)
+        prev_end = current_start
+
+    products = db.query(Product).order_by(Product.product_name).all()
+    result = []
+
+    for p in products:
+        def _base(start, end=None):
+            q = (
+                db.query(ScanRecord)
+                .join(WorkOrder, WorkOrder.id == ScanRecord.work_order_id)
+                .filter(WorkOrder.product_id == p.id, ScanRecord.scan_timestamp >= start)
+            )
+            if end:
+                q = q.filter(ScanRecord.scan_timestamp < end)
+            return q
+
+        cur_total = _base(current_start, current_end).count()
+        cur_ok = _base(current_start, current_end).filter(
+            ScanRecord.quality_status.in_(["ok", "ok_update"])
+        ).count()
+
+        prev_total = _base(prev_start, prev_end).count()
+        prev_ok = _base(prev_start, prev_end).filter(
+            ScanRecord.quality_status.in_(["ok", "ok_update"])
+        ).count()
+
+        cur_yield = round((cur_ok / cur_total * 100) if cur_total else 0.0, 1)
+        prev_yield = round((prev_ok / prev_total * 100) if prev_total else 0.0, 1)
+
+        if prev_total == 0 or abs(cur_yield - prev_yield) < 0.5:
+            trend = "flat"
+        elif cur_yield > prev_yield:
+            trend = "up"
+        else:
+            trend = "down"
+
+        result.append({
+            "product_id": str(p.id),
+            "product_name": p.product_name,
+            "product_code": p.product_code,
+            "yield_rate": cur_yield,
+            "defect_rate": round(100.0 - cur_yield, 1),
+            "trend": trend,
+            "total_scans": cur_total,
+        })
+
+    return {"products": result, "period_days": days}
+
+
 @router.get("/reports/{report_type}")
 async def download_report(
     report_type: str,
@@ -353,8 +424,8 @@ async def download_report(
         generate_two_sheet_report,
     )
 
-    sd = date.fromisoformat(start_date)
-    ed = date.fromisoformat(end_date)
+    sd = date_cls.fromisoformat(start_date)
+    ed = date_cls.fromisoformat(end_date)
 
     if report_type == "scans":
         output = generate_scan_records_excel(db, sd, ed, product_id)

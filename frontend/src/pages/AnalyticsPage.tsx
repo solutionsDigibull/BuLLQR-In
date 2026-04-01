@@ -1,33 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { useWebSocketSubscribe } from '../context/WebSocketContext.tsx';
-import {
-  getDashboard,
-  getOperatorPerformance,
-} from '../services/analytics.ts';
+import { getDashboard } from '../services/analytics.ts';
 import { listProducts } from '../services/config.ts';
-import type {
-  DashboardData,
-  OperatorPerformanceEntry,
-} from '../types/analytics.ts';
+import type { DashboardData } from '../types/analytics.ts';
 import type { Product } from '../types/config.ts';
 import ProductionProgressChart from '../components/analytics/ProductionProgressChart.tsx';
-import OperatorPerformanceChart from '../components/analytics/OperatorPerformanceChart.tsx';
 import CelebrationOverlay from '../components/analytics/CelebrationOverlay.tsx';
 import ExportPanel from '../components/analytics/ExportPanel.tsx';
 import AIChatWidget from '../components/analytics/AIChatWidget.tsx';
+import ProductWisePerformance from '../components/analytics/ProductWisePerformance.tsx';
 
 const REFRESH_INTERVAL = 30_000;
 
 export default function AnalyticsPage() {
   const subscribe = useWebSocketSubscribe();
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-  const [operators, setOperators] = useState<OperatorPerformanceEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
   const prevTargetStatusRef = useRef<string | undefined>(undefined);
 
@@ -41,10 +37,7 @@ export default function AnalyticsPage() {
     async function fetchAll() {
       try {
         const pid = selectedProductId || undefined;
-        const [dashData, opData] = await Promise.all([
-          getDashboard(pid),
-          getOperatorPerformance(7, true, pid),
-        ]);
+        const dashData = await getDashboard(pid, selectedDate);
         if (cancelled) return;
 
         // Detect target completion transition
@@ -55,7 +48,6 @@ export default function AnalyticsPage() {
         prevTargetStatusRef.current = dashData.production_progress.target_status;
 
         setDashboard(dashData);
-        setOperators(opData.operators);
         setError(null);
       } catch {
         if (!cancelled) setError('Failed to load analytics data.');
@@ -65,30 +57,26 @@ export default function AnalyticsPage() {
     }
 
     fetchAll();
-    const timer = setInterval(fetchAll, REFRESH_INTERVAL);
+    const timer = selectedDate === todayStr ? setInterval(fetchAll, REFRESH_INTERVAL) : null;
 
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
     };
-  }, [selectedProductId]);
+  }, [selectedProductId, selectedDate]);
 
-  // Refresh on WebSocket events
+  // Refresh on WebSocket events (only when viewing today)
   useEffect(() => {
+    if (selectedDate !== todayStr) return;
     const pid = selectedProductId || undefined;
     const unsub1 = subscribe('progress_updated', () => {
-      getDashboard(pid).then(setDashboard).catch(() => {});
+      getDashboard(pid, selectedDate).then(setDashboard).catch(() => {});
     });
     const unsub2 = subscribe('scan_created', () => {
-      Promise.all([getDashboard(pid), getOperatorPerformance(7, true, pid)])
-        .then(([d, o]) => {
-          setDashboard(d);
-          setOperators(o.operators);
-        })
-        .catch(() => {});
+      getDashboard(pid, selectedDate).then(setDashboard).catch(() => {});
     });
     return () => { unsub1(); unsub2(); };
-  }, [subscribe, selectedProductId]);
+  }, [subscribe, selectedProductId, selectedDate]);
 
   if (loading) {
     return (
@@ -110,11 +98,30 @@ export default function AnalyticsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Analytics Dashboard</h2>
-        <span className="text-xs text-gray-400 dark:text-gray-500">Auto-refreshes every 30s</span>
+        <div className="flex items-center gap-3">
+          {selectedDate === todayStr && (
+            <span className="text-xs text-gray-400 dark:text-gray-500">Auto-refreshes every 30s</span>
+          )}
+          <div className="flex items-center gap-1.5 border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 bg-white dark:bg-gray-800 shadow-sm">
+            <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <input
+              type="date"
+              value={selectedDate}
+              max={todayStr}
+              onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+              className="text-sm bg-transparent text-gray-700 dark:text-gray-200 outline-none cursor-pointer"
+            />
+          </div>
+        </div>
       </div>
 
       {/* AI Chat Widget */}
       <AIChatWidget />
+
+      {/* Product-wise Performance — always visible */}
+      <ProductWisePerformance date={selectedDate} />
 
       {/* Product Filter */}
       <div className="mb-6">
@@ -135,18 +142,6 @@ export default function AnalyticsPage() {
       {/* Product-specific sections — only shown when a product is selected */}
       {selectedProductId ? (
         <>
-          {/* Overall OK Rate */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-              <p className={`text-3xl font-bold ${
-                dashboard.quality_stats.ok_percentage >= 95 ? 'text-green-600' : 'text-orange-600'
-              }`}>
-                {dashboard.quality_stats.ok_percentage.toFixed(1)}%
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Overall OK Rate</p>
-            </div>
-          </div>
-
           {/* Stage-wise OK / NOT OK breakdown */}
           {dashboard.production_progress.stages.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
@@ -194,12 +189,7 @@ export default function AnalyticsPage() {
         </div>
       )}
 
-      {/* Row 3: Operator performance */}
-      <div className="mb-6">
-        <OperatorPerformanceChart operators={operators} />
-      </div>
-
-      {/* Row 4: Export panel */}
+      {/* Export panel */}
       <div className="mb-6">
         <ExportPanel />
       </div>

@@ -101,7 +101,6 @@ export default function StagesManagement() {
     try {
       const payload: StageCreate = {
         stage_name: form.stage_name,
-        stage_sequence: stages.length + 1,
         description: form.description || undefined,
       };
       if (editingId) {

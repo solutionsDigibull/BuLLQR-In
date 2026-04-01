@@ -201,7 +201,7 @@ export default function ScanPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // Load session data when selected stage changes
+  // Load session data when selected stage or product changes
   useEffect(() => {
     if (!selectedStageId) {
       setRecentScans([]);
@@ -210,17 +210,17 @@ export default function ScanPage() {
       return;
     }
     scanService
-      .getLatestScans(30, selectedStageId)
+      .getLatestScans(30, selectedStageId, selectedProductId || undefined)
       .then((data) => {
         setRecentScans(data.scans);
         setStageTotalCount(data.total_count);
       })
       .catch(() => {});
     scanService
-      .getTodayCount(selectedStageId)
+      .getTodayCount(selectedStageId, selectedProductId || undefined)
       .then((data) => setTodayCount(data.unique_work_orders))
       .catch(() => {});
-  }, [selectedStageId]);
+  }, [selectedStageId, selectedProductId]);
 
   // Keep stage ref in sync for WebSocket callbacks
   useEffect(() => {
@@ -332,12 +332,19 @@ export default function ScanPage() {
     // Stage validation — check previous stages are completed in order
     try {
       const validation = await scanService.checkPreviousStage(barcode, selectedStageId, selectedProductId);
-      if (!validation.valid && validation.missing_stages.length > 0) {
-        const missing = validation.missing_stages.map((s) => `${s.stage_name} (Stage ${s.stage_sequence})`).join(', ');
-        setFeedback({
-          type: 'error',
-          message: `Rejected: Complete previous stages first — ${missing}.`,
-        });
+      if (!validation.valid) {
+        if (validation.missing_stages.length > 0) {
+          const missing = validation.missing_stages.map((s) => `${s.stage_name} (Stage ${s.stage_sequence})`).join(', ');
+          setFeedback({
+            type: 'error',
+            message: `Rejected: Complete previous stages first — ${missing}.`,
+          });
+        } else if (validation.error) {
+          setFeedback({
+            type: 'error',
+            message: `Rejected: ${validation.error}`,
+          });
+        }
         resetScanFlow();
         return;
       }
@@ -458,9 +465,6 @@ export default function ScanPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Scan</h2>
         <div className="flex items-center gap-4 text-sm">
-          <span className="text-gray-500 dark:text-gray-400">
-            Operator: <strong className="text-gray-800 dark:text-gray-200">{user?.full_name}</strong>
-          </span>
           <span className="bg-primary-light text-primary-dark px-3 py-1 rounded-full font-medium">
             Today: {todayCount} WOs
           </span>

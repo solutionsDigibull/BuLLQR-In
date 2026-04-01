@@ -58,11 +58,13 @@ def process_scan(db: Session, scan_request: ScanRequest) -> ScanResponse:
         WorkOrder.work_order_code == scan_request.barcode.strip().upper()
     ).first()
 
-    # Determine product_id for product-specific stage ordering
-    if existing_wo:
-        product_id = existing_wo.product_id
-    elif scan_request.product_id:
+    # Determine product_id for product-specific stage ordering.
+    # Prefer the operator's explicitly selected product (scan_request.product_id),
+    # then fall back to the work order's stored product, then active product.
+    if scan_request.product_id:
         product_id = scan_request.product_id
+    elif existing_wo:
+        product_id = existing_wo.product_id
     else:
         # Fall back to active product for backward compatibility
         active_product = db.query(Product).filter(Product.is_active == True).first()
@@ -148,11 +150,16 @@ def process_scan(db: Session, scan_request: ScanRequest) -> ScanResponse:
 
     quality_status = scan_request.quality_status or "ok"
 
-    # Check for duplicate scan at this stage BEFORE inserting
-    existing_scan = db.query(ScanRecord).filter(
-        ScanRecord.work_order_id == work_order.id,
-        ScanRecord.stage_id == scan_request.stage_id,
-    ).first()
+    # Check for duplicate scan at this stage BEFORE inserting.
+    # Skip duplicate check when scanning for a different product than the WO's stored product —
+    # the same barcode can be used across products, each starting from scan #1.
+    if scan_request.product_id and work_order.product_id and str(work_order.product_id) != str(scan_request.product_id):
+        existing_scan = None
+    else:
+        existing_scan = db.query(ScanRecord).filter(
+            ScanRecord.work_order_id == work_order.id,
+            ScanRecord.stage_id == scan_request.stage_id,
+        ).first()
 
     if existing_scan:
         if quality_status in ("ok_update", "not_ok_update"):
@@ -210,9 +217,13 @@ def process_scan(db: Session, scan_request: ScanRequest) -> ScanResponse:
             return response
         else:
             # Duplicate with ok/not_ok — block it
+            scan_time = (
+                existing_scan.scan_timestamp.strftime("%d %b %Y, %I:%M %p")
+                if existing_scan.scan_timestamp else "unknown time"
+            )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Work order Number is taken"
+                detail=f"Work order '{work_order.work_order_code}' was already scanned at this stage on {scan_time}"
             )
 
     # Classify scan type (first_article, normal, or update)
@@ -287,7 +298,7 @@ def process_scan(db: Session, scan_request: ScanRequest) -> ScanResponse:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Work order Number is taken"
+            detail=f"Work order '{work_order.work_order_code}' is already scanned at this stage"
         )
 
     # Build response

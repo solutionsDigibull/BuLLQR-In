@@ -185,12 +185,13 @@ async def check_previous_stage(
     """Check if all previous stages are completed for a work order.
     Uses product-specific stage ordering from product_stages table."""
 
-    # Determine product_id
+    # Determine product_id — prefer the operator's explicitly selected product,
+    # then fall back to the work order's product, then active product.
     wo = db.query(WorkOrder).filter(WorkOrder.work_order_code == barcode.upper()).first()
-    if wo:
-        pid = wo.product_id
-    elif product_id:
+    if product_id:
         pid = product_id
+    elif wo:
+        pid = wo.product_id
     else:
         # Fall back to active product
         active = db.query(Product).filter(Product.is_active == True).first()

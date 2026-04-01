@@ -85,6 +85,21 @@ export interface COPQSummary {
   };
 }
 
+export interface ProductPerformanceEntry {
+  product_id: string;
+  product_name: string;
+  product_code: string;
+  yield_rate: number;
+  defect_rate: number;
+  trend: 'up' | 'down' | 'flat';
+  total_scans: number;
+}
+
+export interface ProductPerformance {
+  products: ProductPerformanceEntry[];
+  period_days: number;
+}
+
 export interface DashboardData {
   production_progress: ProductionProgress;
   quality_stats: QualityStats;

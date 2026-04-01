@@ -73,7 +73,7 @@ export interface OperatorUpdate {
 // Stage CRUD
 export interface StageCreate {
   stage_name: string;
-  stage_sequence: number;
+  stage_sequence?: number;
   description?: string;
 }
 

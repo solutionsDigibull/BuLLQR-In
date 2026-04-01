@@ -24,9 +24,11 @@ export async function updateQualityStatus(
 export async function getLatestScans(
   limit: number = 10,
   stageId?: string,
+  productId?: string,
 ): Promise<{ scans: ScanRecord[]; total_count: number }> {
   const params: Record<string, unknown> = { limit };
   if (stageId) params.stage_id = stageId;
+  if (productId) params.product_id = productId;
   const response = await api.get<{ scans: ScanRecord[]; total_count: number }>(
     '/session/latest',
     { params },
@@ -34,12 +36,13 @@ export async function getLatestScans(
   return response.data;
 }
 
-export async function getTodayCount(stageId?: string): Promise<{
+export async function getTodayCount(stageId?: string, productId?: string): Promise<{
   unique_work_orders: number;
   date: string;
 }> {
   const params: Record<string, unknown> = {};
   if (stageId) params.stage_id = stageId;
+  if (productId) params.product_id = productId;
   const response = await api.get<{ unique_work_orders: number; date: string }>(
     '/session/today-count',
     { params },
@@ -87,10 +90,11 @@ export async function checkPreviousStage(
   barcode: string,
   stageId: string,
   productId?: string,
-): Promise<{ valid: boolean; missing_stages: { stage_name: string; stage_sequence: number }[] }> {
+): Promise<{ valid: boolean; missing_stages: { stage_name: string; stage_sequence: number }[]; error?: string }> {
   const response = await api.get<{
     valid: boolean;
     missing_stages: { stage_name: string; stage_sequence: number }[];
+    error?: string;
   }>('/scan/check-previous-stage', { params: { barcode, stage_id: stageId, product_id: productId } });
   return response.data;
 }

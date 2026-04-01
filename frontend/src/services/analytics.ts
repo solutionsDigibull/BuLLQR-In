@@ -6,6 +6,7 @@ import type {
   OperatorStageMatrix,
   QualityStats,
   COPQSummary,
+  ProductPerformance,
 } from '../types/analytics.ts';
 
 export async function getProductionProgress(): Promise<ProductionProgress> {
@@ -13,9 +14,10 @@ export async function getProductionProgress(): Promise<ProductionProgress> {
   return response.data;
 }
 
-export async function getDashboard(productId?: string): Promise<DashboardData> {
+export async function getDashboard(productId?: string, date?: string): Promise<DashboardData> {
   const params: Record<string, string> = {};
   if (productId) params.product_id = productId;
+  if (date) params.date = date;
   const response = await api.get<DashboardData>('/analytics/dashboard', { params });
   return response.data;
 }
@@ -58,6 +60,13 @@ export async function getCOPQ(days: number = 30): Promise<COPQSummary> {
   const response = await api.get<COPQSummary>('/analytics/copq', {
     params: { days },
   });
+  return response.data;
+}
+
+export async function getProductPerformance(days: number = 7, date?: string): Promise<ProductPerformance> {
+  const params: Record<string, string | number> = { days };
+  if (date) params.date = date;
+  const response = await api.get<ProductPerformance>('/analytics/product-performance', { params });
   return response.data;
 }
 
