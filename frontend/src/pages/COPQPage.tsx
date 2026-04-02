@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.tsx';
 import { getRejectedCables, applyRework, updateReworkType, getCOPQSummary, getReworkHistoryForScan } from '../services/copq.ts';
-import { listReworkConfigs } from '../services/config.ts';
+import { listReworkCategories } from '../services/config.ts';
 import { formatIST } from '../utils/timezone.ts';
 import type { RejectedCable, COPQSummary, ReworkHistoryEntry } from '../services/copq.ts';
-import type { ReworkConfigItem } from '../types/config.ts';
+import type { ReworkCategory } from '../types/config.ts';
 
 type ViewMode = 'browse' | 'summary';
 
@@ -25,7 +25,7 @@ export default function COPQPage() {
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   // Rework modal
-  const [reworkConfigs, setReworkConfigs] = useState<ReworkConfigItem[]>([]);
+  const [reworkCategories, setReworkCategories] = useState<ReworkCategory[]>([]);
   const [showReworkModal, setShowReworkModal] = useState(false);
   const [selectedCable, setSelectedCable] = useState<RejectedCable | null>(null);
   const [selectedConfigId, setSelectedConfigId] = useState('');
@@ -36,7 +36,7 @@ export default function COPQPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
-    listReworkConfigs(true).then(setReworkConfigs).catch(() => {});
+    listReworkCategories(true).then(setReworkCategories).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -306,10 +306,14 @@ export default function COPQPage() {
                 className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded px-3 py-2 text-sm"
               >
                 <option value="">Select rework type...</option>
-                {reworkConfigs.map((rc) => (
-                  <option key={rc.id} value={rc.id}>
-                    {rc.rework_detail} — {rc.copq_cost.toFixed(2)}
-                  </option>
+                {reworkCategories.map((cat) => (
+                  <optgroup key={cat.id} label={cat.name}>
+                    {cat.rework_configs?.filter((rc) => rc.is_active).map((rc) => (
+                      <option key={rc.id} value={rc.id}>
+                        {rc.rework_detail} — {rc.copq_cost.toFixed(2)}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>

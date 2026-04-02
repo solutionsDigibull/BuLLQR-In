@@ -6,6 +6,7 @@ from typing import Optional, List
 from datetime import datetime, date
 from src.database import get_db
 from src.models import Product, ProductionStage, ProductStage, ReworkCost, Operator, ScanRecord, StageSopFile
+from src.models.rework_category import ReworkCategory
 from src.models.rework_config import ReworkConfig
 from src.models.production_target import ProductionTarget
 from src.auth.password import hash_password
@@ -618,23 +619,19 @@ async def update_rework_cost(
     }
 
 
-# ========== Rework Configs (rework types with COPQ) ==========
+# ========== Rework Categories (rework name grouping) ==========
 
-class ReworkConfigCreateBody(BaseModel):
-    rework_detail: str = Field(..., min_length=1, max_length=200)
-    copq_cost: float = Field(..., ge=0)
-    description: Optional[str] = None
+class ReworkCategoryCreateBody(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
 
-class ReworkConfigUpdateBody(BaseModel):
-    rework_detail: Optional[str] = Field(None, min_length=1, max_length=200)
-    copq_cost: Optional[float] = Field(None, ge=0)
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
+class ReworkCategoryUpdateBody(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
 
 
 def _rework_config_dict(rc: ReworkConfig):
     return {
         "id": str(rc.id),
+        "category_id": str(rc.category_id) if rc.category_id else None,
         "rework_detail": rc.rework_detail,
         "copq_cost": float(rc.copq_cost),
         "description": rc.description,
@@ -644,15 +641,110 @@ def _rework_config_dict(rc: ReworkConfig):
     }
 
 
+def _rework_category_dict(cat: ReworkCategory, include_configs=False):
+    d = {
+        "id": str(cat.id),
+        "name": cat.name,
+        "created_at": cat.created_at.isoformat() if cat.created_at else None,
+        "updated_at": cat.updated_at.isoformat() if cat.updated_at else None,
+    }
+    if include_configs:
+        d["rework_configs"] = [_rework_config_dict(rc) for rc in cat.rework_configs]
+    return d
+
+
+@router.get("/rework-categories")
+async def list_rework_categories(
+    include_configs: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    """List all rework categories, optionally with their child configs."""
+    cats = db.query(ReworkCategory).order_by(ReworkCategory.name).all()
+    return {"rework_categories": [_rework_category_dict(c, include_configs) for c in cats]}
+
+
+@router.post("/rework-categories", status_code=status.HTTP_201_CREATED)
+async def create_rework_category(
+    body: ReworkCategoryCreateBody,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role("supervisor", "admin")),
+):
+    """Create a new rework category (rework name)."""
+    existing = db.query(ReworkCategory).filter(ReworkCategory.name == body.name).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Category name already exists")
+    cat = ReworkCategory(id=uuid.uuid4(), name=body.name, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
+    db.add(cat)
+    db.commit()
+    db.refresh(cat)
+    return _rework_category_dict(cat)
+
+
+@router.put("/rework-categories/{category_id}")
+async def update_rework_category(
+    category_id: str,
+    body: ReworkCategoryUpdateBody,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role("supervisor", "admin")),
+):
+    """Rename a rework category."""
+    cat = db.query(ReworkCategory).filter(ReworkCategory.id == category_id).first()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    if body.name is not None:
+        dup = db.query(ReworkCategory).filter(ReworkCategory.name == body.name, ReworkCategory.id != cat.id).first()
+        if dup:
+            raise HTTPException(status_code=409, detail="Category name already exists")
+        cat.name = body.name
+    cat.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(cat)
+    return _rework_category_dict(cat)
+
+
+@router.delete("/rework-categories/{category_id}")
+async def delete_rework_category(
+    category_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role("supervisor", "admin")),
+):
+    """Delete a rework category and all its child rework types."""
+    cat = db.query(ReworkCategory).filter(ReworkCategory.id == category_id).first()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    db.delete(cat)
+    db.commit()
+    return {"message": "Category deleted", "id": category_id}
+
+
+# ========== Rework Configs (rework types with COPQ) ==========
+
+class ReworkConfigCreateBody(BaseModel):
+    rework_detail: str = Field(..., min_length=1, max_length=200)
+    copq_cost: float = Field(..., ge=0)
+    description: Optional[str] = None
+    category_id: Optional[str] = None
+
+class ReworkConfigUpdateBody(BaseModel):
+    rework_detail: Optional[str] = Field(None, min_length=1, max_length=200)
+    copq_cost: Optional[float] = Field(None, ge=0)
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    category_id: Optional[str] = None
+
+
 @router.get("/rework-configs")
 async def list_rework_configs(
     active_only: bool = Query(False),
+    category_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """List rework config types."""
+    """List rework config types, optionally filtered by category."""
     q = db.query(ReworkConfig)
     if active_only:
         q = q.filter(ReworkConfig.is_active == True)
+    if category_id is not None:
+        q = q.filter(ReworkConfig.category_id == category_id)
     configs = q.order_by(ReworkConfig.rework_detail).all()
     return {"rework_configs": [_rework_config_dict(rc) for rc in configs]}
 
@@ -664,11 +756,19 @@ async def create_rework_config(
     current_user=Depends(require_role("supervisor", "admin")),
 ):
     """Create a new rework config type."""
-    existing = db.query(ReworkConfig).filter(ReworkConfig.rework_detail == body.rework_detail).first()
-    if existing:
-        raise HTTPException(status_code=409, detail="Rework detail already exists")
+    if body.category_id:
+        cat = db.query(ReworkCategory).filter(ReworkCategory.id == body.category_id).first()
+        if not cat:
+            raise HTTPException(status_code=404, detail="Category not found")
+    dup_q = db.query(ReworkConfig).filter(
+        ReworkConfig.rework_detail == body.rework_detail,
+        ReworkConfig.category_id == body.category_id,
+    )
+    if dup_q.first():
+        raise HTTPException(status_code=409, detail="Rework detail already exists in this category")
     rc = ReworkConfig(
         id=uuid.uuid4(),
+        category_id=body.category_id,
         rework_detail=body.rework_detail,
         copq_cost=body.copq_cost,
         description=body.description,
@@ -690,12 +790,17 @@ async def update_rework_config(
     rc = db.query(ReworkConfig).filter(ReworkConfig.id == config_id).first()
     if not rc:
         raise HTTPException(status_code=404, detail="Rework config not found")
-    if body.rework_detail is not None:
+    target_category_id = body.category_id if body.category_id is not None else rc.category_id
+    target_detail = body.rework_detail if body.rework_detail is not None else rc.rework_detail
+    if body.rework_detail is not None or body.category_id is not None:
         dup = db.query(ReworkConfig).filter(
-            ReworkConfig.rework_detail == body.rework_detail, ReworkConfig.id != rc.id
+            ReworkConfig.rework_detail == target_detail,
+            ReworkConfig.category_id == target_category_id,
+            ReworkConfig.id != rc.id,
         ).first()
         if dup:
-            raise HTTPException(status_code=409, detail="Rework detail already exists")
+            raise HTTPException(status_code=409, detail="Rework detail already exists in this category")
+    if body.rework_detail is not None:
         rc.rework_detail = body.rework_detail
     if body.copq_cost is not None:
         rc.copq_cost = body.copq_cost
@@ -703,6 +808,8 @@ async def update_rework_config(
         rc.description = body.description
     if body.is_active is not None:
         rc.is_active = body.is_active
+    if body.category_id is not None:
+        rc.category_id = body.category_id
     rc.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(rc)
@@ -715,14 +822,13 @@ async def delete_rework_config(
     db: Session = Depends(get_db),
     current_user=Depends(require_role("supervisor", "admin")),
 ):
-    """Soft-delete (deactivate) a rework config type."""
+    """Permanently delete a rework config type."""
     rc = db.query(ReworkConfig).filter(ReworkConfig.id == config_id).first()
     if not rc:
         raise HTTPException(status_code=404, detail="Rework config not found")
-    rc.is_active = False
-    rc.updated_at = datetime.utcnow()
+    db.delete(rc)
     db.commit()
-    return {"message": "Rework config deactivated", "id": config_id}
+    return {"message": "Rework config deleted", "id": config_id}
 
 
 # ========== Standalone Production Target (daily) ==========

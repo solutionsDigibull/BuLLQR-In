@@ -18,6 +18,7 @@ export default function StagesManagement() {
   const [form, setForm] = useState<{ stage_name: string; description: string }>({ stage_name: '', description: '' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
 
   // SOP state
   const [sopFiles, setSopFiles] = useState<Record<string, SopFile[]>>({});
@@ -158,12 +159,26 @@ export default function StagesManagement() {
 
       <div className="flex justify-between items-center">
         <h3 className="text-base font-medium text-gray-700 dark:text-gray-200">Production Stages</h3>
-        <button
-          onClick={() => { setShowForm(true); setEditingId(null); setForm({ stage_name: '', description: '' }); }}
-          className="px-3 py-1.5 bg-primary text-white text-sm rounded hover:bg-primary-dark"
-        >
-          + Add Stage
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search stages..."
+              className="pl-7 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <button
+            onClick={() => { setShowForm(true); setEditingId(null); setForm({ stage_name: '', description: '' }); }}
+            className="px-3 py-1.5 bg-primary text-white text-sm rounded hover:bg-primary-dark"
+          >
+            + Add Stage
+          </button>
+        </div>
       </div>
 
       <p className="text-xs text-gray-400 dark:text-gray-500">Stage order is configured per product in the Products tab (Edit Product).</p>
@@ -210,7 +225,10 @@ export default function StagesManagement() {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-          {stages.map((s) => (
+          {stages.filter((s) => {
+            const q = search.toLowerCase();
+            return !q || s.stage_name.toLowerCase().includes(q) || (s.description || '').toLowerCase().includes(q);
+          }).map((s) => (
             <>
               <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                 <td className="px-4 py-2 font-medium text-gray-800 dark:text-gray-100">{s.stage_name}</td>

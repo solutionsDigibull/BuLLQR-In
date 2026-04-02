@@ -130,7 +130,7 @@ export default function Sidebar() {
         </nav>
 
         <div className="p-4 border-t border-sidebar-hover flex items-center gap-2">
-          <img src="/bullmqr-logo.png" alt="BuLLMQR" className="h-8" />
+          <img src="/bullmqr-logo.png" alt="BuLLMQR" className="h-14" />
         </div>
       </aside>
 

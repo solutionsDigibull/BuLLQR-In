@@ -21,7 +21,13 @@
       "Bash(pip show:*)",
       "Bash(pip install:*)",
       "Bash(MSYS_NO_PATHCONV=1 docker exec:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(npm install:*)",
+      "Bash(./node_modules/.bin/tsc -b --noEmit)",
+      "Bash(find C:UsersAdminCAT-Sp-u2backendsrcrouters -type f -name *.py)",
+      "Bash(git add:*)",
+      "Bash(docker-compose --version)",
+      "Bash(find:*)"
     ]
   }
 }

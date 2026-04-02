@@ -12,6 +12,8 @@ import type {
   OperatorUpdate,
   StageCreate,
   StageUpdate,
+  ReworkCategory,
+  ReworkCategoryCreate,
   ReworkConfigItem,
   ReworkConfigCreate,
   ReworkConfigUpdate,
@@ -148,6 +150,28 @@ export async function deleteSopFile(stageId: string, fileId: string): Promise<vo
 
 export function getSopFileUrl(stageId: string, fileId: string): string {
   return `/api/v1/config/stages/${stageId}/sop/${fileId}/content`;
+}
+
+// Rework Categories
+export async function listReworkCategories(includeConfigs = false): Promise<ReworkCategory[]> {
+  const response = await api.get<{ rework_categories: ReworkCategory[] }>('/config/rework-categories', {
+    params: { include_configs: includeConfigs },
+  });
+  return response.data.rework_categories;
+}
+
+export async function createReworkCategory(data: ReworkCategoryCreate): Promise<ReworkCategory> {
+  const response = await api.post<ReworkCategory>('/config/rework-categories', data);
+  return response.data;
+}
+
+export async function updateReworkCategory(categoryId: string, data: ReworkCategoryCreate): Promise<ReworkCategory> {
+  const response = await api.put<ReworkCategory>(`/config/rework-categories/${categoryId}`, data);
+  return response.data;
+}
+
+export async function deleteReworkCategory(categoryId: string): Promise<void> {
+  await api.delete(`/config/rework-categories/${categoryId}`);
 }
 
 // Rework Configs

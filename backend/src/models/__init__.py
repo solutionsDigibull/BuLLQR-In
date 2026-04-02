@@ -6,6 +6,7 @@ from src.models.work_order import WorkOrder
 from src.models.scan_record import ScanRecord
 from src.models.quality_status_log import QualityStatusLog
 from src.models.rework_cost import ReworkCost
+from src.models.rework_category import ReworkCategory
 from src.models.rework_config import ReworkConfig
 from src.models.rework_history import ReworkHistory
 from src.models.production_target import ProductionTarget
@@ -21,6 +22,7 @@ __all__ = [
     "ScanRecord",
     "QualityStatusLog",
     "ReworkCost",
+    "ReworkCategory",
     "ReworkConfig",
     "ReworkHistory",
     "ProductionTarget",

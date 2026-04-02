@@ -83,9 +83,23 @@ export interface StageUpdate {
   description?: string;
 }
 
+// Rework Category (Rework Name)
+export interface ReworkCategory {
+  id: string;
+  name: string;
+  rework_configs?: ReworkConfigItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReworkCategoryCreate {
+  name: string;
+}
+
 // Rework Config
 export interface ReworkConfigItem {
   id: string;
+  category_id: string | null;
   rework_detail: string;
   copq_cost: number;
   description: string | null;
@@ -98,6 +112,7 @@ export interface ReworkConfigCreate {
   rework_detail: string;
   copq_cost: number;
   description?: string;
+  category_id?: string;
 }
 
 export interface ReworkConfigUpdate {
@@ -105,6 +120,7 @@ export interface ReworkConfigUpdate {
   copq_cost?: number;
   description?: string;
   is_active?: boolean;
+  category_id?: string;
 }
 
 // SOP Files
