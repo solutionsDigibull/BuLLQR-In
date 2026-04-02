@@ -55,7 +55,7 @@ services:
     environment:
       - SERVICE_FQDN_FRONTEND_80=http://bullmqr.bullmatrix.ai
     ports:
-      - "8080:80"
+      - "80"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
       interval: 30s
