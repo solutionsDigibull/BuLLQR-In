@@ -7,6 +7,7 @@ import xlsxwriter
 from src.models import (
     ScanRecord, WorkOrder, ProductionStage, Operator, Product, ReworkCost,
 )
+from src.models.product_stage import ProductStage
 from src.models.rework_history import ReworkHistory
 from src.utils.timezone import utc_to_ist
 
@@ -141,7 +142,16 @@ def _write_copq_sheet(wb, db: Session, start: date, end: date, product_id: str =
     start_dt = datetime(start.year, start.month, start.day)
     end_dt = datetime(end.year, end.month, end.day, 23, 59, 59)
 
-    stages = db.query(ProductionStage).order_by(ProductionStage.stage_sequence).all()
+    if product_id:
+        stages = (
+            db.query(ProductionStage)
+            .join(ProductStage, ProductStage.stage_id == ProductionStage.id)
+            .filter(ProductStage.product_id == product_id)
+            .order_by(ProductStage.sequence)
+            .all()
+        )
+    else:
+        stages = db.query(ProductionStage).order_by(ProductionStage.stage_sequence).all()
 
     row = 1
     grand_total_rejected = 0
