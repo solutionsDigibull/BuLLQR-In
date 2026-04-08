@@ -29,6 +29,8 @@ export default function ProductManagement() {
   const [formName, setFormName] = useState('');
   // Map of stageId -> sequence (only for checked stages)
   const [formStageMap, setFormStageMap] = useState<Map<string, number>>(new Map());
+  // Stage search filter
+  const [stageSearch, setStageSearch] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +62,7 @@ export default function ProductManagement() {
     setFormCode('');
     setFormName('');
     setFormStageMap(new Map());
+    setStageSearch('');
     setModalMode('create');
     setSelectedProduct(null);
   }
@@ -74,6 +77,7 @@ export default function ProductManagement() {
       map.set(sid, seqs[sid] ?? 1);
     }
     setFormStageMap(map);
+    setStageSearch('');
     setSelectedProduct(product);
     setModalMode('edit');
   }
@@ -180,6 +184,14 @@ export default function ProductManagement() {
 
   // Sorted stages for the modal: checked ones sorted by their sequence, unchecked by global sequence
   const sortedAllStages = [...allStages].sort((a, b) => a.stage_sequence - b.stage_sequence);
+
+  // Filtered stages based on search
+  const filteredStages = stageSearch.trim()
+    ? sortedAllStages.filter((s) =>
+        s.stage_name.toLowerCase().includes(stageSearch.trim().toLowerCase()) ||
+        (s.description && s.description.toLowerCase().includes(stageSearch.trim().toLowerCase()))
+      )
+    : sortedAllStages;
 
   if (loading) {
     return (
@@ -301,38 +313,53 @@ export default function ProductManagement() {
                 ) : allStages.length === 0 ? (
                   <p className="text-xs text-gray-400">No stages configured. Create stages first.</p>
                 ) : (
-                  <div className="border border-gray-200 rounded-md p-3 space-y-2 max-h-64 overflow-y-auto bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
-                    {sortedAllStages.map((stage) => {
-                      const isChecked = formStageMap.has(stage.id);
-                      const seq = formStageMap.get(stage.id) ?? stage.stage_sequence;
-                      return (
-                        <div key={stage.id} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => toggleStage(stage.id, stage.stage_sequence)}
-                            className="rounded border-gray-300 text-primary focus:ring-primary shrink-0"
-                          />
-                          {isChecked ? (
-                            <input
-                              type="number"
-                              min={1}
-                              value={seq}
-                              onChange={(e) => updateSequence(stage.id, parseInt(e.target.value) || 1)}
-                              className="w-12 border border-gray-300 rounded px-1.5 py-0.5 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-primary dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-                            />
-                          ) : (
-                            <span className="w-12 text-gray-400 font-mono text-xs text-center">—</span>
-                          )}
-                          <span className={isChecked ? 'text-gray-700 font-medium' : 'text-gray-400'}>
-                            {stage.stage_name}
-                          </span>
-                          {stage.description && (
-                            <span className="text-gray-400 text-xs ml-1 truncate">— {stage.description}</span>
-                          )}
-                        </div>
-                      );
-                    })}
+                  <div className="border border-gray-200 rounded-md bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
+                    <div className="p-2 border-b border-gray-200 dark:border-gray-600">
+                      <input
+                        type="text"
+                        value={stageSearch}
+                        onChange={(e) => setStageSearch(e.target.value)}
+                        placeholder="Search stages..."
+                        className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500 dark:placeholder-gray-400"
+                      />
+                    </div>
+                    <div className="p-3 space-y-2 max-h-64 overflow-y-auto">
+                      {filteredStages.length === 0 ? (
+                        <p className="text-xs text-gray-400 text-center py-2">No stages match your search.</p>
+                      ) : (
+                        filteredStages.map((stage) => {
+                          const isChecked = formStageMap.has(stage.id);
+                          const seq = formStageMap.get(stage.id) ?? stage.stage_sequence;
+                          return (
+                            <div key={stage.id} className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleStage(stage.id, stage.stage_sequence)}
+                                className="rounded border-gray-300 text-primary focus:ring-primary shrink-0"
+                              />
+                              {isChecked ? (
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={seq}
+                                  onChange={(e) => updateSequence(stage.id, parseInt(e.target.value) || 1)}
+                                  className="w-12 border border-gray-300 rounded px-1.5 py-0.5 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-primary dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+                                />
+                              ) : (
+                                <span className="w-12 text-gray-400 font-mono text-xs text-center">—</span>
+                              )}
+                              <span className={isChecked ? 'text-gray-700 dark:text-gray-200 font-medium' : 'text-gray-400 dark:text-gray-500'}>
+                                {stage.stage_name}
+                              </span>
+                              {stage.description && (
+                                <span className="text-gray-400 dark:text-gray-500 text-xs ml-1 truncate">— {stage.description}</span>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
                 )}
                 {formStageMap.size > 0 && (
