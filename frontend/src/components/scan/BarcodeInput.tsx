@@ -1,4 +1,4 @@
-import { useRef, useEffect, type KeyboardEvent } from 'react';
+import { useRef, useEffect, type KeyboardEvent, type ChangeEvent } from 'react';
 
 interface BarcodeInputProps {
   value: string;
@@ -11,6 +11,16 @@ interface BarcodeInputProps {
 const MIN_LENGTH = 20;
 const MAX_LENGTH = 100;
 const REFOCUS_INTERVAL_MS = 2000;
+const SCAN_INACTIVITY_MS = 80;
+
+function normalize(raw: string): string {
+  return raw
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+    .replace(/;/g, ':');
+}
 
 export default function BarcodeInput({
   value,
@@ -20,12 +30,40 @@ export default function BarcodeInput({
   error,
 }: BarcodeInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const bufferRef = useRef('');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimer = () => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const flushScan = () => {
+    clearTimer();
+    const cleaned = normalize(bufferRef.current);
+    bufferRef.current = '';
+    if (cleaned.length >= MIN_LENGTH && cleaned.length <= MAX_LENGTH) {
+      onScan(cleaned);
+    }
+    onChange('');
+  };
 
   // Auto-focus on mount and when re-enabled
   useEffect(() => {
     if (!disabled) {
       inputRef.current?.focus();
     }
+  }, [disabled]);
+
+  // Clear pending buffer/timer when the input is disabled, and on unmount.
+  useEffect(() => {
+    if (disabled) {
+      clearTimer();
+      bufferRef.current = '';
+    }
+    return clearTimer;
   }, [disabled]);
 
   // Interval-based refocus to keep barcode input active, but skip when the
@@ -42,13 +80,18 @@ export default function BarcodeInput({
     return () => clearInterval(interval);
   }, [disabled]);
 
+  function handleChange(e: ChangeEvent<HTMLInputElement>) {
+    const next = e.target.value;
+    bufferRef.current = next;
+    onChange(next);
+    clearTimer();
+    timerRef.current = setTimeout(flushScan, SCAN_INACTIVITY_MS);
+  }
+
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const trimmed = value.trim();
-      if (trimmed.length >= MIN_LENGTH && trimmed.length <= MAX_LENGTH) {
-        onScan(trimmed);
-      }
+      flushScan();
     }
   }
 
@@ -75,7 +118,7 @@ export default function BarcodeInput({
           id="barcode-input"
           type="text"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           disabled={disabled}
           placeholder="Scan here"

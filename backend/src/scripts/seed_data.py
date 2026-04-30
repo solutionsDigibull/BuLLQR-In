@@ -13,15 +13,15 @@ import uuid
 
 def seed_production_stages(db):
     """
-    Seed 5 production stages in sequence.
+    Seed 5 default production stages on a fresh database only.
 
-    Stages:
-    1. Cutting
-    2. Stripping
-    3. Crimping
-    4. Testing
-    5. Final Inspection
+    Skipped on any DB that already has stages, so renamed/removed stages
+    on existing deployments are not re-created on redeploy.
     """
+    if db.query(ProductionStage).count() > 0:
+        print("✓ Production stages already exist, skipping seed")
+        return
+
     stages = [
         {"stage_name": "Cutting", "stage_sequence": 1, "description": "Cable cutting stage"},
         {"stage_name": "Stripping", "stage_sequence": 2, "description": "Wire stripping stage"},
@@ -31,11 +31,8 @@ def seed_production_stages(db):
     ]
 
     for stage_data in stages:
-        # Check if stage already exists
-        existing = db.query(ProductionStage).filter_by(stage_name=stage_data["stage_name"]).first()
-        if not existing:
-            stage = ProductionStage(id=uuid.uuid4(), **stage_data)
-            db.add(stage)
+        stage = ProductionStage(id=uuid.uuid4(), **stage_data)
+        db.add(stage)
 
     db.commit()
     print("✓ Created 5 production stages")
