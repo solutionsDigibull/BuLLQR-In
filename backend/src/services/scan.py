@@ -6,6 +6,7 @@ from src.models import ScanRecord, Operator, ProductionStage, WorkOrder, Product
 from src.services.work_order import get_or_create_work_order
 from src.services import quality as quality_service
 from src.schemas.scan import ScanRequest, ScanResponse, WorkOrderStatusResponse
+from src.utils.barcode import normalize_barcode
 from datetime import datetime
 import uuid
 import asyncio
@@ -55,7 +56,7 @@ def process_scan(db: Session, scan_request: ScanRequest) -> ScanResponse:
     # Enforce sequential stage order BEFORE creating work order
     # Check if this work order already exists
     existing_wo = db.query(WorkOrder).filter(
-        WorkOrder.work_order_code == scan_request.barcode.strip().upper()
+        WorkOrder.work_order_code == normalize_barcode(scan_request.barcode)
     ).first()
 
     # Determine product_id for product-specific stage ordering.
@@ -120,22 +121,22 @@ def process_scan(db: Session, scan_request: ScanRequest) -> ScanResponse:
     # For existing work orders, the serial was already assigned — no gap risk.
     if not existing_wo and product_id:
         needs_first_article = quality_service.check_first_article_approval_required(
-            db, product_id, scan_request.stage_id
+            db, scan_request.stage_id
         )
         if needs_first_article:
             if not scan_request.quality_inspector_id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="First article inspection requires quality_inspector_id. "
-                           "This is the first scan of this product at this stage and requires QI approval."
+                           "This is the first scan at this stage today and requires QI approval."
                 )
             # Validate quality inspector early so we don't waste a serial on invalid QI
             quality_service.validate_quality_inspector(db, scan_request.quality_inspector_id)
         else:
-            if not quality_service.check_first_article_approved(db, product_id, scan_request.stage_id):
+            if not quality_service.check_first_article_approved(db, scan_request.stage_id):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Cannot process scan: First article for this product at this stage "
+                    detail="Cannot process scan: First article for this stage "
                            "has not been approved yet. Please wait for QI approval."
                 )
 
@@ -231,7 +232,6 @@ def process_scan(db: Session, scan_request: ScanRequest) -> ScanResponse:
         db,
         work_order.id,
         scan_request.stage_id,
-        work_order.product_id
     )
 
     # Determine if this is first article
@@ -244,7 +244,7 @@ def process_scan(db: Session, scan_request: ScanRequest) -> ScanResponse:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="First article inspection requires quality_inspector_id. "
-                       "This is the first scan of this product at this stage and requires QI approval."
+                       "This is the first scan at this stage today and requires QI approval."
             )
 
         # Validate quality inspector
@@ -258,12 +258,11 @@ def process_scan(db: Session, scan_request: ScanRequest) -> ScanResponse:
         # Check if first article has been approved before allowing normal scans
         if not quality_service.check_first_article_approved(
             db,
-            work_order.product_id,
-            scan_request.stage_id
+            scan_request.stage_id,
         ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Cannot process scan: First article for this product at this stage "
+                detail="Cannot process scan: First article for this stage "
                        "has not been approved yet. Please wait for QI approval."
             )
 
@@ -371,7 +370,8 @@ def get_work_order_status(db: Session, barcode: str) -> WorkOrderStatusResponse:
         >>> print(status.completed_stages)  # ["Cutting", "Stripping"]
     """
     # Find work order
-    work_order = db.query(WorkOrder).filter(WorkOrder.work_order_code == barcode).first()
+    normalized = normalize_barcode(barcode)
+    work_order = db.query(WorkOrder).filter(WorkOrder.work_order_code == normalized).first()
     if not work_order:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

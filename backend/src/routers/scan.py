@@ -14,6 +14,8 @@ from src.services import quality as quality_service
 from src.services import rework as rework_service
 from src.models import ScanRecord, ProductionStage, WorkOrder, Operator, Product, ProductStage
 from src.auth.rbac import require_role
+from src.utils.barcode import normalize_barcode
+from src.utils.timezone import ist_date_bounds_naive, today_ist_date
 import uuid
 import asyncio
 
@@ -187,7 +189,7 @@ async def check_previous_stage(
 
     # Determine product_id — prefer the operator's explicitly selected product,
     # then fall back to the work order's product, then active product.
-    wo = db.query(WorkOrder).filter(WorkOrder.work_order_code == barcode.upper()).first()
+    wo = db.query(WorkOrder).filter(WorkOrder.work_order_code == normalize_barcode(barcode)).first()
     if product_id:
         pid = product_id
     elif wo:
@@ -261,14 +263,17 @@ async def get_first_article_status(
     db: Session = Depends(get_db),
     current_user=Depends(require_role("operator", "quality_inspector", "supervisor", "admin")),
 ):
-    """Return which stages have completed first article today."""
+    """Return which stages have completed first article today.
+
+    The day window is interpreted in IST (the operator's local day), not UTC,
+    so the first-article gate does not silently roll over at 05:30 IST.
+    """
     if target_date:
         d = date.fromisoformat(target_date)
     else:
-        d = datetime.utcnow().date()
+        d = today_ist_date()
 
-    day_start = datetime(d.year, d.month, d.day)
-    day_end = datetime(d.year, d.month, d.day, 23, 59, 59)
+    day_start, day_end = ist_date_bounds_naive(d)
 
     stages = db.query(ProductionStage).order_by(ProductionStage.stage_sequence).all()
     result = []

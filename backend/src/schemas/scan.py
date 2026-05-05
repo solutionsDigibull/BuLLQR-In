@@ -4,6 +4,8 @@ from typing import Optional
 from pydantic import BaseModel, Field, validator
 import uuid
 
+from src.utils.barcode import normalize_barcode
+
 
 class ScanRequest(BaseModel):
     """
@@ -49,8 +51,8 @@ class ScanRequest(BaseModel):
 
     @validator('barcode')
     def validate_barcode_format(cls, v):
-        """Normalize barcode to uppercase."""
-        return v.strip().upper()
+        """Normalize barcode (whitespace collapse, uppercase, ; -> :)."""
+        return normalize_barcode(v)
 
     class Config:
         schema_extra = {

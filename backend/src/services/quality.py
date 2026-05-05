@@ -2,6 +2,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from src.models import Operator, ScanRecord, QualityStatusLog, WorkOrder, ProductionStage
+from src.utils.timezone import today_ist_start_naive
 from datetime import datetime
 import uuid
 
@@ -44,30 +45,26 @@ def validate_quality_inspector(db: Session, quality_inspector_id: uuid.UUID) -> 
 
 def check_first_article_approval_required(
     db: Session,
-    product_id: uuid.UUID,
     stage_id: uuid.UUID
 ) -> bool:
     """
-    Check if first article approval is required for this product at this stage.
+    Check if first article approval is required at this stage today.
 
-    First article is required if no scans exist TODAY for this product at this stage.
+    First article is required if no scans exist TODAY at this stage. Scope is
+    per-(stage, day), independent of product: the very first scan of the day
+    at a given stage is the FA, regardless of which product the operator has
+    selected.
 
     Args:
         db: Database session
-        product_id: Product UUID
         stage_id: Production stage UUID
 
     Returns:
         bool: True if first article approval is required, False otherwise
     """
-    from src.models import WorkOrder
+    day_start = today_ist_start_naive()
 
-    today = datetime.utcnow().date()
-    day_start = datetime(today.year, today.month, today.day)
-
-    # Check if any work orders for this product have been scanned at this stage TODAY
-    existing_scan = db.query(ScanRecord).join(WorkOrder).filter(
-        WorkOrder.product_id == product_id,
+    existing_scan = db.query(ScanRecord).filter(
         ScanRecord.stage_id == stage_id,
         ScanRecord.scan_timestamp >= day_start,
     ).first()
@@ -77,28 +74,23 @@ def check_first_article_approval_required(
 
 def check_first_article_approved(
     db: Session,
-    product_id: uuid.UUID,
     stage_id: uuid.UUID
 ) -> bool:
     """
-    Check if the first article for this product at this stage has been approved TODAY.
+    Check if the first article at this stage has been approved TODAY.
+
+    Scope is per-(stage, day), independent of product.
 
     Args:
         db: Database session
-        product_id: Product UUID
         stage_id: Production stage UUID
 
     Returns:
         bool: True if first article has been approved today, False otherwise
     """
-    from src.models import WorkOrder
+    day_start = today_ist_start_naive()
 
-    today = datetime.utcnow().date()
-    day_start = datetime(today.year, today.month, today.day)
-
-    # Check if any first article scan (with QI) exists for this product at this stage TODAY
-    approved_first_article = db.query(ScanRecord).join(WorkOrder).filter(
-        WorkOrder.product_id == product_id,
+    approved_first_article = db.query(ScanRecord).filter(
         ScanRecord.stage_id == stage_id,
         ScanRecord.is_first_article == True,
         ScanRecord.quality_inspector_id.isnot(None),
@@ -111,8 +103,7 @@ def check_first_article_approved(
 def classify_scan_type(
     db: Session,
     work_order_id: uuid.UUID,
-    stage_id: uuid.UUID,
-    product_id: uuid.UUID
+    stage_id: uuid.UUID
 ) -> str:
     """
     Classify the scan type based on existing scan history.
@@ -121,26 +112,21 @@ def classify_scan_type(
         db: Database session
         work_order_id: Work order UUID
         stage_id: Production stage UUID
-        product_id: Product UUID for first article detection
 
     Returns:
         str: Scan type ('first_article', 'normal', or 'update')
     """
-    # Check if this work order has already been scanned at this stage
     existing_scan = db.query(ScanRecord).filter(
         ScanRecord.work_order_id == work_order_id,
         ScanRecord.stage_id == stage_id
     ).first()
 
     if existing_scan:
-        # This is an update scan
         return "update"
 
-    # Check if this is the first article for this product at this stage
-    if check_first_article_approval_required(db, product_id, stage_id):
+    if check_first_article_approval_required(db, stage_id):
         return "first_article"
 
-    # Normal scan after first article is approved
     return "normal"
 
 

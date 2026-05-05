@@ -210,7 +210,7 @@ export default function ScanPage() {
       return;
     }
     scanService
-      .getLatestScans(30, selectedStageId, selectedProductId || undefined)
+      .getLatestScans(30, selectedStageId)
       .then((data) => {
         setRecentScans(data.scans);
         setStageTotalCount(data.total_count);

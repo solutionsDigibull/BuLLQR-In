@@ -1,5 +1,5 @@
 """Timezone conversion utilities for UTC ↔ IST."""
-from datetime import datetime, timezone
+from datetime import datetime, date, timedelta, timezone
 import pytz
 
 # Timezone objects
@@ -94,3 +94,31 @@ def today_ist_start() -> datetime:
     now_ist = utc_now().astimezone(IST)
     today_start_ist = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
     return ist_to_utc(today_start_ist)
+
+
+def today_ist_start_naive() -> datetime:
+    """Midnight IST today as a naive UTC datetime, for comparison with
+    ``scan_records.scan_timestamp`` (stored as naive UTC via ``datetime.utcnow()``).
+    Comparing tz-aware to naive raises in SQLAlchemy/psycopg2; this helper avoids it."""
+    return today_ist_start().replace(tzinfo=None)
+
+
+def ist_date_bounds_naive(d: date) -> tuple[datetime, datetime]:
+    """Return ``(start_utc_naive, end_utc_naive)`` for the IST calendar day ``d``.
+
+    The bounds are inclusive on both ends and expressed as naive UTC datetimes.
+    ``end_utc_naive`` is one microsecond before the next IST midnight, mirroring
+    the previous ``23:59:59`` upper bound but without losing the final second's
+    microseconds.
+    """
+    start_ist = IST.localize(datetime(d.year, d.month, d.day, 0, 0, 0))
+    end_ist = IST.localize(datetime(d.year, d.month, d.day, 0, 0, 0)) + timedelta(days=1) - timedelta(microseconds=1)
+    return (
+        start_ist.astimezone(UTC).replace(tzinfo=None),
+        end_ist.astimezone(UTC).replace(tzinfo=None),
+    )
+
+
+def today_ist_date() -> date:
+    """The current IST calendar date (used as the default 'today' on backend endpoints)."""
+    return utc_now().astimezone(IST).date()

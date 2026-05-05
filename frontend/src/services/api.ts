@@ -21,11 +21,11 @@ api.interceptors.response.use(
   (error) => {
     const url = error.config?.url || '';
     const isAuthRequest = url.includes('/auth/login') || url.includes('/auth/verify-sa-password');
+    // 401 = token missing/expired/invalid → session is broken, force re-login.
+    // 403 = authenticated but the specific action is denied (e.g. first-article gate,
+    //   role mismatch). Let the caller surface error.response.data.detail to the user;
+    //   do NOT clear the session or navigate.
     if (error.response?.status === 401 && !isAuthRequest) {
-      clearAuth();
-      window.location.href = '/login';
-    }
-    if (error.response?.status === 403 && !isAuthRequest) {
       clearAuth();
       window.location.href = '/login';
     }

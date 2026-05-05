@@ -2,6 +2,7 @@
 from typing import Optional
 from sqlalchemy.orm import Session
 from src.models import WorkOrder, Product
+from src.utils.barcode import normalize_barcode
 from datetime import datetime
 import uuid
 
@@ -21,6 +22,9 @@ def get_or_create_work_order(db: Session, barcode: str, product_id: Optional[uui
     Raises:
         ValueError: If no product_id provided and no active product configured
     """
+    # Canonicalize so lookup and storage use the same form regardless of caller.
+    barcode = normalize_barcode(barcode)
+
     # Try to find existing work order
     work_order = db.query(WorkOrder).filter(WorkOrder.work_order_code == barcode).first()
 
