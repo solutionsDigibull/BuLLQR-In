@@ -7,6 +7,7 @@ from src.services.work_order import get_or_create_work_order
 from src.services import quality as quality_service
 from src.schemas.scan import ScanRequest, ScanResponse, WorkOrderStatusResponse
 from src.utils.barcode import normalize_barcode
+from src.utils.timezone import utc_to_ist
 from datetime import datetime
 import uuid
 import asyncio
@@ -219,7 +220,7 @@ def process_scan(db: Session, scan_request: ScanRequest) -> ScanResponse:
         else:
             # Duplicate with ok/not_ok — block it
             scan_time = (
-                existing_scan.scan_timestamp.strftime("%d %b %Y, %I:%M %p")
+                utc_to_ist(existing_scan.scan_timestamp).strftime("%d %b %Y, %I:%M %p IST")
                 if existing_scan.scan_timestamp else "unknown time"
             )
             raise HTTPException(

@@ -471,12 +471,6 @@ export default function ScanPage() {
         </div>
       </div>
 
-      <ScanFeedback
-        type={feedback.type}
-        message={feedback.message}
-        onDismiss={dismissFeedback}
-      />
-
       {/* Setup & Input Panel */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5 space-y-5">
 
@@ -670,6 +664,12 @@ export default function ScanPage() {
             onScan={handleBarcodeScanned}
             disabled={!isSetupReady || isSubmitting || flowState !== 'idle'}
             error={barcodeError}
+          />
+
+          <ScanFeedback
+            type={feedback.type}
+            message={feedback.message}
+            onDismiss={dismissFeedback}
           />
 
           {scannedBarcode && flowState !== 'idle' && (
