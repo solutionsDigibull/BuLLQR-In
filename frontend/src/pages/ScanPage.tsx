@@ -65,7 +65,7 @@ export default function ScanPage() {
 
   // First article status per stage (for today)
   const [firstArticleStages, setFirstArticleStages] = useState<
-    Map<string, boolean>
+    Map<string, { completed: boolean; completedAt: string | null }>
   >(new Map());
   const [firstArticleNotice, setFirstArticleNotice] = useState('');
 
@@ -191,8 +191,10 @@ export default function ScanPage() {
       .getFirstArticleStatus()
       .then((data) => {
         if (!cancelled) {
-          const map = new Map<string, boolean>();
-          data.stages.forEach((s) => map.set(s.stage_id, s.first_article_completed));
+          const map = new Map<string, { completed: boolean; completedAt: string | null }>();
+          data.stages.forEach((s) =>
+            map.set(s.stage_id, { completed: s.first_article_completed, completedAt: s.completed_at }),
+          );
           setFirstArticleStages(map);
         }
       })
@@ -233,7 +235,7 @@ export default function ScanPage() {
       setFirstArticleNotice('');
       return;
     }
-    const completed = firstArticleStages.get(selectedStageId);
+    const completed = firstArticleStages.get(selectedStageId)?.completed;
     if (completed === false) {
       const stage = stages.find((s) => s.id === selectedStageId);
       const stageName = stage ? stage.stage_name : 'this stage';
@@ -274,6 +276,13 @@ export default function ScanPage() {
       setRecentScans((prev) => [scan, ...prev].slice(0, 30));
       setStageTotalCount((prev) => prev + 1);
       setTodayCount((prev) => prev + 1);
+      if (scan.is_first_article) {
+        setFirstArticleStages((prev) => {
+          const next = new Map(prev);
+          next.set(scan.stage_id, { completed: true, completedAt: scan.scan_timestamp });
+          return next;
+        });
+      }
       addHighlight(scan.id);
     });
   }, [subscribe]);
@@ -391,8 +400,10 @@ export default function ScanPage() {
       scanService
         .getFirstArticleStatus()
         .then((data) => {
-          const map = new Map<string, boolean>();
-          data.stages.forEach((s) => map.set(s.stage_id, s.first_article_completed));
+          const map = new Map<string, { completed: boolean; completedAt: string | null }>();
+          data.stages.forEach((s) =>
+            map.set(s.stage_id, { completed: s.first_article_completed, completedAt: s.completed_at }),
+          );
           setFirstArticleStages(map);
         })
         .catch(() => {});
@@ -783,7 +794,10 @@ export default function ScanPage() {
             <div className="flex justify-between">
               <span className="text-gray-400 font-medium tracking-wider uppercase">Timestamp</span>
               <span className="text-white font-mono text-right">
-                {recentScans[0]?.scan_timestamp ? formatIST(recentScans[0].scan_timestamp) : '—'}
+                {(() => {
+                  const at = firstArticleStages.get(selectedStageId)?.completedAt;
+                  return at ? formatIST(at) : '—';
+                })()}
               </span>
             </div>
           </div>
